@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vruksha — Voice Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF7EE; --ink:#1A1A1A; --blue:#1212CC; --amber:#C88A00; --green:#1B7A3D; --red:#B0242A;
+    --ground:#16130E; --dim:#6E665A; --line:rgba(26,26,26,.14); --line-2:rgba(26,26,26,.28);
+    --serif:"Fraunces",Georgia,"Times New Roman",serif;
+    --display:"Instrument Serif",var(--serif);
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  body{
+    background:var(--ground);
+    background-image:radial-gradient(1200px 600px at 50% -10%, #2b2417 0%, var(--ground) 62%),
+      radial-gradient(900px 500px at 12% 110%, #221c12 0%, transparent 55%),
+      radial-gradient(900px 500px at 88% 108%, #1d2417 0%, transparent 55%);
+    background-size:100% 100%, 140% 140%, 140% 140%;
+    background-position:50% 0, 0 100%, 100% 100%;
+    animation:driftbg 22s ease-in-out infinite alternate;
+    color:var(--ink);font-family:var(--serif);min-height:100vh;
+    display:flex;align-items:center;justify-content:center;padding:28px 16px;
+  }
+  @keyframes driftbg{100%{background-position:50% 0, 14% 90%, 86% 90%}}
+  /* faint paper grain over the whole page */
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:99;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain 6s steps(4) infinite}
+  @keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-2%)}100%{transform:translate(3%,2%)}}
+
+  .sheet{
+    width:min(680px,100%);background:var(--paper);
+    border-radius:6px;padding:40px 48px 34px;
+    box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 24px 60px -20px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.25);
+    position:relative;animation:sheetIn .7s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes sheetIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+  .sheet::before{content:"";position:absolute;inset:8px;border:1px solid var(--line);border-radius:3px;pointer-events:none}
+  /* thin animated gold seam along the very top edge */
+  .sheet::after{content:"";position:absolute;left:8px;right:8px;top:8px;height:2px;border-radius:2px;pointer-events:none;
+    background:linear-gradient(90deg,transparent,var(--amber),transparent);background-size:220% 100%;
+    animation:seam 7s linear infinite;opacity:.6}
+  @keyframes seam{from{background-position:220% 0}to{background-position:-120% 0}}
+
+  /* masthead */
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--dim);text-align:center;display:flex;gap:9px;align-items:center;justify-content:center;
+    animation:fadeUp .6s .1s both}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;
+    box-shadow:0 0 0 0 rgba(18,18,204,.5);animation:beacon 2.4s ease-out infinite}
+  .eyebrow .dot:last-child{animation-delay:1.2s}
+  @keyframes beacon{0%{box-shadow:0 0 0 0 rgba(18,18,204,.45)}70%{box-shadow:0 0 0 7px rgba(18,18,204,0)}100%{box-shadow:0 0 0 0 rgba(18,18,204,0)}}
+  h1{font-family:var(--display);font-weight:400;font-size:52px;line-height:.98;text-align:center;
+    margin:12px 0 8px;letter-spacing:.005em;animation:fadeUp .7s .16s both}
+  h1 .b{color:var(--blue);font-style:italic;position:relative}
+  h1 .b::after{content:"";position:absolute;left:0;right:0;bottom:.07em;height:2px;background:var(--blue);
+    transform:scaleX(0);transform-origin:left;animation:underline 1s 1s forwards}
+  @keyframes underline{to{transform:scaleX(1)}}
+  .lede{text-align:center;color:var(--dim);font-size:15px;line-height:1.5;margin:0 auto 22px;max-width:44ch;
+    animation:fadeUp .7s .24s both}
+  .rule{height:1px;background:var(--line);margin:22px 0}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  /* controls */
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .between{justify-content:space-between}
+  .center{justify-content:center}
+  button{font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;
+    border-radius:4px;border:1px solid var(--line-2);background:transparent;color:var(--ink);
+    padding:11px 18px;transition:transform .12s ease,box-shadow .18s ease,background .18s,border-color .18s,color .18s;
+    font-weight:500;position:relative;overflow:hidden}
+  button:hover{border-color:var(--ink);transform:translateY(-1px)}
+  button:active{transform:translateY(1px)}
+  /* light sweep across solid buttons on hover */
+  button.primary,button.good{color:#fff}
+  button.primary::before,button.good::before{content:"";position:absolute;inset:0;
+    background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+    transform:translateX(-120%);transition:transform .6s ease}
+  button.primary:hover::before,button.good:hover::before{transform:translateX(120%)}
+  button.primary{background:var(--blue);border-color:var(--blue)}
+  button.primary:hover{background:#0d0da3;box-shadow:0 8px 20px -8px rgba(18,18,204,.6)}
+  button.good{background:var(--green);border-color:var(--green)}
+  button.good:hover{box-shadow:0 8px 20px -8px rgba(27,122,61,.6)}
+  button.bad{color:var(--red);border-color:rgba(176,36,42,.4)}
+  button.bad:hover{border-color:var(--red)}
+  button.ghost{border:none;color:var(--dim);padding:6px 10px;font-size:12px}
+  button.ghost:hover{color:var(--ink);transform:none}
+  button.pill{border-radius:999px;padding:9px 16px}
+  button:disabled{opacity:.4;cursor:default}
+  .wide{width:100%;justify-content:center}
+
+  /* conversation */
+  .agent{font-family:var(--serif);font-weight:500;font-size:25px;line-height:1.3;margin:6px 0 4px;min-height:66px}
+  .agent.reveal{animation:qIn .5s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes qIn{from{opacity:0;transform:translateY(8px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+  .heard{font-family:var(--mono);font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-wrap;min-height:24px;
+    border-left:2px solid var(--amber);padding:2px 0 2px 12px;opacity:.9;transition:border-color .3s}
+  .heard:empty{border-left-color:transparent}
+  .heard.in{animation:qIn .35s ease both}
+
+  /* recorder visualizer */
+  .orb-wrap{display:grid;place-items:center;margin:26px 0 10px;position:relative}
+  .orb{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;position:relative;transition:.25s;
+    color:var(--dim);
+    background:
+      radial-gradient(circle at 50% 38%, #fff 0%, rgba(255,255,255,0) 60%),
+      radial-gradient(circle at 50% 50%, rgba(26,26,26,.05), rgba(26,26,26,.015) 70%);
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 10px 24px -14px rgba(0,0,0,.4);
+    border:1px solid var(--line-2)}
+  .orb .ic{width:38px;height:38px;position:absolute;stroke:currentColor;fill:none;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round;opacity:0;transform:scale(.8);transition:.25s}
+  .orb[data-state="idle"]   .ic-mic{opacity:.5;transform:none}
+  .orb[data-state="listen"] .ic-mic{opacity:1;transform:none}
+  .orb[data-state="speak"]  .ic-wave{opacity:1;transform:none}
+  .orb[data-state="think"]  .ic-think{opacity:1;transform:none}
+  .orb[data-state="think"] .ic-think circle{animation:blink 1.2s ease-in-out infinite}
+  .orb[data-state="think"] .ic-think circle:nth-child(2){animation-delay:.2s}
+  .orb[data-state="think"] .ic-think circle:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+  /* two expanding halo rings */
+  .orb::after,.orb::before{content:"";position:absolute;inset:-10px;border-radius:50%;border:1.5px solid transparent;pointer-events:none}
+  .orb[data-state="speak"]{border-color:var(--blue);color:var(--blue);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 0 30px -6px rgba(18,18,204,.4)}
+  .orb[data-state="speak"]::after{border-color:rgba(18,18,204,.3);animation:ring 1.6s ease-out infinite}
+  .orb[data-state="speak"]::before{border-color:rgba(18,18,204,.2);animation:ring 1.6s ease-out .8s infinite}
+  .orb[data-state="listen"]{border-color:var(--amber);color:var(--amber);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 0 30px -6px rgba(200,138,0,.45)}
+  .orb[data-state="listen"]::after{border-color:rgba(200,138,0,.35);animation:ring 1.2s ease-out infinite}
+  .orb[data-state="listen"]::before{border-color:rgba(200,138,0,.25);animation:ring 1.2s ease-out .6s infinite}
+  .orb[data-state="think"]{border-color:var(--green);color:var(--green)}
+  .orb[data-state="think"]::after{border-color:rgba(27,122,61,.3);animation:ring .9s ease-out infinite}
+  .orb[data-state="speak"],.orb[data-state="listen"],.orb[data-state="think"]{animation:breathe 2.8s ease-in-out infinite}
+  @keyframes ring{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.32);opacity:0}}
+  @keyframes breathe{50%{transform:scale(1.04)}}
+  /* live waveform — visible only while listening */
+  .bars{display:flex;gap:4px;height:0;align-items:center;margin-top:16px;opacity:0;transition:opacity .3s}
+  .orb[data-state="listen"] ~ .bars{opacity:1;height:26px}
+  .bars span{width:3px;height:6px;border-radius:3px;background:var(--amber)}
+  .orb[data-state="listen"] ~ .bars span{animation:eq .9s ease-in-out infinite}
+  .bars span:nth-child(2){animation-delay:.12s}.bars span:nth-child(3){animation-delay:.28s}
+  .bars span:nth-child(4){animation-delay:.42s}.bars span:nth-child(5){animation-delay:.2s}
+  .bars span:nth-child(6){animation-delay:.34s}.bars span:nth-child(7){animation-delay:.08s}
+  .bars span:nth-child(8){animation-delay:.3s}.bars span:nth-child(9){animation-delay:.16s}
+  @keyframes eq{0%,100%{height:6px}50%{height:26px}}
+  .state{text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);margin:12px 0 0;transition:color .3s}
+
+  /* the log entry (confirm + result) — styled like a Proof card */
+  .entry{border:1px solid var(--line-2);border-radius:5px;padding:18px 18px 16px;background:rgba(26,26,26,.015);
+    animation:entryIn .55s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes entryIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .entry .what{animation:fadeUp .5s .12s both}
+  .entry .why{animation:fadeUp .5s .22s both}
+  .verb{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;color:#fff;background:var(--ink);padding:4px 10px;border-radius:3px;
+    animation:pop .5s .05s cubic-bezier(.2,1.4,.3,1) both}
+  @keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+  .verb.built{background:var(--green)} .verb.decided{background:var(--blue)} .verb.thinking{background:var(--blue)}
+  .verb.stuck{background:var(--amber)} .verb.mistake{background:var(--red)}
+  .entry .what{font-family:var(--serif);font-size:20px;line-height:1.4;margin:12px 0 0}
+  .entry .why{font-family:var(--serif);font-size:16px;line-height:1.5;color:#33302a;margin:10px 0 0}
+  .entry .why .kw{font-family:var(--mono);font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.14em}
+  .result{font-family:var(--mono);font-size:12px;line-height:1.6;white-space:pre-wrap;overflow:auto;
+    background:#f2ecdd;border-radius:4px;padding:12px;margin:14px 0 0;color:#3a362d;max-height:230px}
+
+  textarea{width:100%;min-height:56px;background:#fff;border:1px solid var(--line-2);border-radius:4px;
+    color:var(--ink);font:14px/1.5 var(--mono);padding:11px;margin-bottom:8px;resize:vertical}
+  a{color:var(--blue)}
+  .foot{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+    text-align:center;margin:22px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.75}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="eyebrow"><span class="dot"></span> Vruksha · Voice Log for Proof <span class="dot"></span></div>
+  <h1>Speak your <span class="b">proof</span>.</h1>
+  <p class="lede">Tell it what you worked on today. It listens, asks one thing back, and writes your Proof log — in your own words.</p>
+
+  <!-- start -->
+  <div id="start">
+    <div class="rule"></div>
+    <div class="row between">
+      <span class="label">Language</span>
+      <div class="row"><button id="lang-en" class="primary pill">English</button><button id="lang-ta" class="pill">தமிழ்</button></div>
+    </div>
+    <p class="lede" style="margin:18px auto 20px">About two minutes, hands-free. It asks, listens on its own, asks one follow-up, and reads it back. Nothing posts until you say yes.</p>
+    <button id="begin" class="primary wide" style="padding:14px">Start session</button>
+    <p class="foot" id="mode"></p>
+  </div>
+
+  <!-- conversation -->
+  <div id="convo" class="hidden">
+    <div class="rule"></div>
+    <p class="agent" id="agentText">…</p>
+    <div class="orb-wrap">
+      <div class="orb" id="orb" data-state="idle">
+        <svg class="ic ic-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+        <svg class="ic ic-wave" viewBox="0 0 24 24"><path d="M4 9v6"/><path d="M8 5v14"/><path d="M12 8v8"/><path d="M16 4v16"/><path d="M20 9v6"/></svg>
+        <svg class="ic ic-think" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+      </div>
+      <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
+    <p class="state" id="state">…</p>
+    <p class="heard" id="heard"></p>
+    <div class="row center" style="margin-top:14px">
+      <button id="done" class="primary hidden">Done speaking</button>
+    </div>
+    <div class="row center" style="margin-top:10px">
+      <button id="redo" class="ghost">↺ say again</button>
+      <button id="typeToggle" class="ghost">⌨ type instead</button>
+    </div>
+    <div id="typeBox" class="hidden" style="margin-top:12px">
+      <textarea id="typed" placeholder="type your answer"></textarea>
+      <button id="sendTyped" class="pill">Send answer →</button>
+    </div>
+  </div>
+
+  <!-- confirm -->
+  <div id="confirm" class="hidden">
+    <div class="rule"></div>
+    <p class="label" style="text-align:center;margin-bottom:14px">Here is your log — your words, unedited</p>
+    <div class="entry">
+      <span class="verb" id="cVerb">log</span>
+      <p class="what" id="cContent"></p>
+      <p class="why" id="whyLine"><span class="kw">because</span> <span id="cWhy"></span></p>
+    </div>
+    <p class="state" id="confirmState" style="margin-top:14px">say “yes” to post · “no” to cancel</p>
+    <div class="row center" style="margin-top:14px">
+      <button id="yes" class="good">Yes, post it</button>
+      <button id="no" class="bad">No, cancel</button>
+    </div>
+  </div>
+
+  <!-- result -->
+  <div id="finish" class="hidden">
+    <div class="rule"></div>
+    <p class="agent" id="doneMsg" style="min-height:0"></p>
+    <pre class="result" id="result"></pre>
+    <button id="again" class="primary wide" style="margin-top:16px">Start another</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let lang = "en", sid = null, sttMode = "browser";
+let recognizer = null, rec = null, chunks = [], listening = false, currentStage = null;
+const show = (el,on)=>$(el).classList.toggle("hidden",!on);
+
+$("#lang-en").onclick = () => setLang("en");
+$("#lang-ta").onclick = () => setLang("ta");
+function setLang(l){ lang=l; $("#lang-en").classList.toggle("primary",l==="en"); $("#lang-ta").classList.toggle("primary",l==="ta"); }
+
+function orb(mode, label){
+  const state = ["speak","listen","think"].includes(mode) ? mode : "idle";
+  $("#orb").dataset.state = state;
+  $("#state").textContent = label;
+}
+
+// speak, and RESOLVE only when the audio finishes — so we can listen right after.
+function speak(text){
+  return new Promise(async resolve => {
+    if(!text) return resolve();
+    orb("speak","speaking");
+    try{
+      const r = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
+      if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); a.onended=resolve; a.onerror=resolve; return a.play().catch(resolve); }
+    }catch(e){}
+    try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=lang==="ta"?"ta-IN":"en-US";
+         u.onend=resolve; u.onerror=resolve; speechSynthesis.speak(u);
+         setTimeout(resolve, Math.min(12000, 1500+text.length*70)); // safety if onend never fires
+    }catch(e){ resolve(); }
+  });
+}
+
+$("#begin").onclick = async () => {
+  const d = await (await fetch(`/api/session/start?lang=${lang}`, {method:"POST"})).json();
+  sid = d.session_id;
+  show("#start",false); show("#convo",true);
+  runStage(d);
+};
+
+// the heart of the hands-free loop
+function reveal(el){ el.classList.remove("reveal","in"); void el.offsetWidth; el.classList.add(el.id==="agentText"?"reveal":"in"); }
+function setAgent(text){ const el=$("#agentText"); el.textContent=text; reveal(el); }
+function setHeard(text){ const el=$("#heard"); el.textContent=text; if(text) reveal(el); }
+
+async function runStage(d){
+  currentStage = d.stage;
+  if(d.stage==="confirm"){ return goConfirm(d); }
+  setAgent(d.say || "…");
+  $("#heard").textContent = "";
+  await speak(d.say);
+  autoListen(text => sendAnswer(text, null));
+}
+
+// listen automatically; browser SpeechRecognition detects end-of-speech on its own (no click)
+function autoListen(onFinal){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(sttMode==="browser" && SR){
+    recognizer = new SR(); recognizer.lang = lang==="ta"?"ta-IN":"en-US";
+    recognizer.interimResults = true; recognizer.continuous = false; recognizer.maxAlternatives = 1;
+    let finalText = "";
+    listening = true; orb("listen","listening — just talk");
+    recognizer.onresult = e => {
+      let interim=""; finalText="";
+      for(const r of e.results){ (r.isFinal ? finalText+=r[0].transcript : interim+=r[0].transcript); }
+      $("#heard").textContent = "“" + (finalText||interim) + "”";
+    };
+    recognizer.onend = () => {
+      listening=false;
+      if(finalText.trim()){ orb("think","thinking"); onFinal(finalText.trim()); }
+      else { orb("listen","didn’t catch that — tap ↺ or just talk"); }  // silence: wait, let them retry
+    };
+    recognizer.onerror = () => { listening=false; orb("","tap ↺ to try again"); };
+    recognizer.start();
+    return;
+  }
+  // no SpeechRecognition: record audio, auto-stop on silence, send to server Whisper
+  recordWithSilence(blob => { orb("think","transcribing"); onFinal_audio = onFinal; sendAnswer("", blob); });
+}
+let onFinal_audio = null;
+
+// Tunable turn-taking. Trailing silence is TIME based (robust to frame rate) and generous,
+// so a thinking pause mid-answer doesn't end your turn. You can also tap "Done speaking".
+const SILENCE_MS = 2200;   // quiet after you've spoken before it moves on (~2.2s)
+const MIN_SPEECH_MS = 900; // ignore blips shorter than this (cough, "um")
+const GRACE_MS = 6000;     // if you never start talking, keep waiting this long before a gentle nudge
+
+async function recordWithSilence(finish){
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  rec = new MediaRecorder(stream); chunks=[];
+  const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(stream);
+  const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an); const buf=new Uint8Array(an.fftSize);
+  let started=false, startAt=0, lastVoiceAt=performance.now(), ended=false;
+  listening=true; orb("listen","listening — take your time"); show("#done",true);
+  rec.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  // Build the blob in onstop: ondataavailable fires ASYNC after stop(), so the chunk
+  // isn't in `chunks` yet on the line right after rec.stop(). This is why it was 0 bytes.
+  rec.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); try{ctx.close()}catch(e){};
+    finish(new Blob(chunks,{type:"audio/webm"})); };
+  const stop=()=>{ if(ended) return; ended=true; listening=false; show("#done",false);
+    try{rec.stop()}catch(e){ finish(new Blob(chunks,{type:"audio/webm"})); } };
+  $("#done").onclick = stop;                       // manual end — you're in control
+  rec.start(250);                                  // timeslice: deliver data every 250ms while recording
+  const tick=()=>{ if(ended) return; an.getByteTimeDomainData(buf);
+    let peak=0; for(const v of buf) peak=Math.max(peak,Math.abs(v-128));
+    const now=performance.now();
+    if(peak>10){ if(!started){started=true;startAt=now;} lastVoiceAt=now; orb("listen","listening…"); }
+    const quietFor = now-lastVoiceAt;
+    if(started){
+      const spokeEnough = (lastVoiceAt-startAt) > MIN_SPEECH_MS;
+      if(spokeEnough && quietFor > SILENCE_MS){ return stop(); }   // natural end of turn
+      if(quietFor > 800 && quietFor <= SILENCE_MS) orb("listen","(pause — still listening)");
+    } else if(now-lastVoiceAt > GRACE_MS){
+      orb("listen","take your time — tap Done when ready");        // never auto-stop before they speak
+    }
+    requestAnimationFrame(tick);
+  }; requestAnimationFrame(tick);
+}
+
+$("#redo").onclick = () => { if(listening) return; if(currentStage==="confirm"){ orb("listen","say yes or no"); autoListen(t=>sendConfirm(t)); } else { autoListen(t=>sendAnswer(t,null)); } };
+$("#typeToggle").onclick = () => { const b=$("#typeBox"); b.classList.toggle("hidden"); };
+$("#sendTyped").onclick = () => { const t=$("#typed").value.trim(); if(!t) return; $("#typed").value=""; show("#typeBox",false); $("#heard").textContent="“"+t+"”"; (currentStage==="confirm"?sendConfirm(t):sendAnswer(t,null)); };
+
+async function sendAnswer(text, blob){
+  if(recognizer){ try{recognizer.abort()}catch(e){} }
+  const fd = new FormData();
+  if(text) fd.append("transcript", text);
+  if(blob) fd.append("audio", blob, "a.webm");
+  const r = await fetch(`/api/session/${sid}/answer`, {method:"POST", body:fd});
+  if(!r.ok){ orb("","error — tap ↺"); $("#heard").textContent=(await r.json()).detail||"error"; return; }
+  const d = await r.json();
+  if(d.transcript) setHeard("“" + d.transcript + "”");
+  orb("think","got it");
+  setTimeout(()=>runStage(d), 1100);  // let them read what was heard before the next question
+}
+
+function goConfirm(d){
+  show("#convo",false); show("#confirm",true);
+  const v=(d.draft.verb||"log").toLowerCase();
+  $("#cVerb").textContent=v; $("#cVerb").className="verb "+v;
+  $("#cContent").textContent=d.draft.content;
+  const why=(d.draft.why||"").trim();
+  $("#cWhy").textContent=why; show("#whyLine", !!why);   // no empty "because" line
+  speak(d.say).then(()=>autoListen(t=>sendConfirm(t)));  // read back, then listen for yes/no hands-free
+}
+$("#yes").onclick = () => sendConfirm("yes, post it");
+$("#no").onclick  = () => sendConfirm("no");
+async function sendConfirm(utterance){
+  if(recognizer){ try{recognizer.abort()}catch(e){} }
+  const d = await (await fetch(`/api/session/${sid}/confirm`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({utterance})})).json();
+  if(d.needs==="confirm"){ $("#confirmState").textContent="please say yes or no"; autoListen(t=>sendConfirm(t)); return; }
+  show("#confirm",false); show("#finish",true);
+  const posted = d.stage==="posted";
+  $("#doneMsg").textContent = posted ? "✓ In the record." : "Okay — not posted.";
+  $("#result").textContent = JSON.stringify(d.post_result||{message:"cancelled"}, null, 2);
+  speak(posted ? (lang==="ta"?"பதிவு செய்யப்பட்டது":"Posted to your record.") : (lang==="ta"?"பதிவு செய்யவில்லை":"Okay, not posted."));
+}
+$("#again").onclick = () => location.reload();
+
+fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt;
+  $("#mode").textContent = `${h.dry_run?"dry-run · nothing posts":"live"} · stt ${h.stt} · llm ${h.llm} · tts ${h.tts}`;
+});
+</script>
+</body>
+</html>

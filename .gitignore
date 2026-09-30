@@ -1,0 +1,13 @@
+.env
+.env.local
+sessions.json
+*.webm
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.wav
+*.mp3
+.pytest_cache/
+models/
+.DS_Store
