@@ -2,7 +2,7 @@
 FROM python:3.11-slim
 WORKDIR /app
 
-RUN pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq "psycopg[binary]"
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq "psycopg[binary]" pyotp
 
 COPY app ./app
 COPY frontend ./frontend

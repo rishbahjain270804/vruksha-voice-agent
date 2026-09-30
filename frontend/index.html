@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --paper:#FBF7EE; --ink:#1A1A1A; --blue:#1212CC; --amber:#C88A00; --green:#1B7A3D; --red:#B0242A;
@@ -160,6 +161,17 @@
   a{color:var(--blue)}
   .foot{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
     text-align:center;margin:22px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.75}
+  .memwho{font-family:var(--mono);font-size:12px;color:var(--ink)}
+  .hint{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--dim);text-align:center;margin:14px 0 0;opacity:.85}
+  .acctbox{border:1px solid var(--line-2);border-radius:6px;background:#fff;padding:16px;margin-top:12px;
+    box-shadow:0 8px 24px -18px rgba(18,18,204,.35);animation:qIn .35s ease both}
+  .acctbox input{width:100%;background:#fff;border:1px solid var(--line-2);border-radius:4px;color:var(--ink);
+    font:14px var(--mono);padding:10px;margin:6px 0}
+  .acctbox .step{font-family:var(--serif);font-size:15px;line-height:1.4;margin:2px 0 8px}
+  #qrbox{display:flex;justify-content:center;margin:12px 0;padding:12px;background:#fff;border:1px solid var(--line);border-radius:6px}
+  #qrbox img,#qrbox canvas{display:block}
+  .acctmsg{font-family:var(--mono);font-size:11.5px;margin:8px 0 0;min-height:16px;color:var(--dim)}
+  .acctmsg.ok{color:var(--green)} .acctmsg.err{color:var(--red)}
   .hidden{display:none}
 </style>
 </head>
@@ -178,6 +190,18 @@
     </div>
     <p class="lede" style="margin:18px auto 20px">Hands-free. It asks, waits while you think, asks one thing back, and reads it out. Nothing posts until you say so.</p>
     <button id="begin" class="primary wide" style="padding:14px">Start talking</button>
+
+    <div class="rule"></div>
+    <div class="row between">
+      <span class="label">Memory</span>
+      <span id="memWho" class="memwho">this browser</span>
+    </div>
+    <div class="row center" style="margin-top:8px;gap:14px">
+      <button id="acctSetup" class="ghost">set up a code</button>
+      <button id="acctConnect" class="ghost">connect on this device</button>
+    </div>
+    <div id="acctPanel" class="hidden"></div>
+    <p class="hint">an authenticator code (like Google Authenticator) lets your memory follow you to any device</p>
   </div>
 
   <!-- conversation -->
@@ -235,9 +259,10 @@
 <script>
 const $ = s => document.querySelector(s);
 let lang = "en", sid = null, sttMode = "browser";
-// anonymous per-browser id so this browser's recall stays its own — no login needed
+// per-browser "recall code" — no login. Copy it to carry your memory to another browser/device.
+function genCode(){ const a="abcdefghjkmnpqrstuvwxyz23456789"; let s=""; for(let i=0;i<8;i++){ if(i===4)s+="-"; s+=a[Math.floor(Math.random()*a.length)]; } return s; }
 let CID = "";
-try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID = (crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()); localStorage.setItem("vruksha_cid", CID); } }catch(e){ CID = ""; }
+try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID = genCode(); localStorage.setItem("vruksha_cid", CID); } }catch(e){ CID = genCode(); }
 let recognizer = null, rec = null, chunks = [], listening = false, currentStage = null;
 const show = (el,on)=>$(el).classList.toggle("hidden",!on);
 
@@ -399,6 +424,63 @@ async function sendConfirm(utterance){
   speak(posted ? (lang==="ta"?"பதிவு செய்யப்பட்டது":"Posted to your record.") : (lang==="ta"?"பதிவு செய்யவில்லை":"Okay, not posted."));
 }
 $("#again").onclick = () => location.reload();
+
+// ---- account: username + authenticator (TOTP) so memory can follow across devices ----
+let USER = "";
+try{ USER = localStorage.getItem("vruksha_user") || ""; if(USER) CID = USER; }catch(e){}
+function setMemLabel(){ $("#memWho").textContent = USER ? "@"+USER : "this browser"; }
+function acctClose(){ show("#acctPanel", false); $("#acctPanel").innerHTML=""; }
+function setConnected(u){ USER=u; CID=u; try{localStorage.setItem("vruksha_user",u);}catch(e){} setMemLabel(); acctClose(); }
+setMemLabel();
+
+async function postJSON(url, body){ return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+
+$("#acctSetup").onclick = () => {
+  const p=$("#acctPanel"); show("#acctPanel",true);
+  p.innerHTML = `<div class="acctbox">
+    <p class="step">Pick a username. You'll scan a QR into your authenticator app, so your memory follows you anywhere.</p>
+    <input id="suUser" placeholder="username (3–32 chars)" autocomplete="off">
+    <button id="suCreate" class="primary wide">Create code</button>
+    <p class="acctmsg" id="suMsg"></p></div>`;
+  $("#suCreate").onclick = async () => {
+    const u=$("#suUser").value.trim(), m=$("#suMsg"); m.className="acctmsg"; m.textContent="creating…";
+    try{
+      const r=await postJSON("/api/auth/setup",{username:u});
+      if(!r.ok){ m.className="acctmsg err"; m.textContent=(await r.json()).detail||"failed"; return; }
+      const {otpauth}=await r.json();
+      p.innerHTML = `<div class="acctbox">
+        <p class="step">Scan this in Google Authenticator or Authy, then enter the 6-digit code it shows.</p>
+        <div id="qrbox"></div>
+        <input id="suCode" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code">
+        <button id="suVerify" class="primary wide">Verify &amp; connect</button>
+        <p class="acctmsg" id="suMsg2"></p></div>`;
+      try{ new QRCode(document.getElementById("qrbox"), {text: otpauth, width:176, height:176}); }
+      catch(e){ $("#qrbox").textContent = otpauth; }
+      $("#suVerify").onclick = async () => {
+        const code=$("#suCode").value.trim(), m2=$("#suMsg2"); m2.className="acctmsg"; m2.textContent="verifying…";
+        const vr=await postJSON("/api/auth/verify",{username:u,code});
+        if(vr.ok){ m2.className="acctmsg ok"; m2.textContent="connected as @"+u; setTimeout(()=>setConnected(u),700); }
+        else { m2.className="acctmsg err"; m2.textContent="that code didn't match — enter the current one"; }
+      };
+    }catch(e){ m.className="acctmsg err"; m.textContent="network error"; }
+  };
+};
+
+$("#acctConnect").onclick = () => {
+  const p=$("#acctPanel"); show("#acctPanel",true);
+  p.innerHTML = `<div class="acctbox">
+    <p class="step">Enter your username and the current 6-digit code from your authenticator.</p>
+    <input id="cnUser" placeholder="username" autocomplete="off">
+    <input id="cnCode" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code">
+    <button id="cnGo" class="primary wide">Connect</button>
+    <p class="acctmsg" id="cnMsg"></p></div>`;
+  $("#cnGo").onclick = async () => {
+    const u=$("#cnUser").value.trim(), code=$("#cnCode").value.trim(), m=$("#cnMsg"); m.className="acctmsg"; m.textContent="connecting…";
+    const r=await postJSON("/api/auth/verify",{username:u,code});
+    if(r.ok){ m.className="acctmsg ok"; m.textContent="connected as @"+u; setTimeout(()=>setConnected(u),700); }
+    else { m.className="acctmsg err"; m.textContent="invalid username or code"; }
+  };
+};
 
 fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt; }).catch(()=>{});
 </script>

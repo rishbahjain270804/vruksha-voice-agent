@@ -15,7 +15,7 @@ services:
     plan: free
     # Lean runtime deps only: STT=groq and TTS=elevenlabs need no local models,
     # so we skip faster-whisper / edge-tts here to keep the build small and fast.
-    buildCommand: pip install fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq "psycopg[binary]"
+    buildCommand: pip install fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq "psycopg[binary]" pyotp
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     autoDeploy: true

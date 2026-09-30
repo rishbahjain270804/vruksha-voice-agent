@@ -53,6 +53,24 @@ def index():
     return FRONTEND.read_text(encoding="utf-8") if FRONTEND.exists() else "<h1>frontend/index.html missing</h1>"
 
 
+@app.post("/api/auth/setup")
+def auth_setup(body: dict):
+    from . import auth
+    ok, res = auth.setup(body.get("username", ""))
+    if not ok:
+        raise HTTPException(400, res)
+    return {"otpauth": res}
+
+
+@app.post("/api/auth/verify")
+def auth_verify(body: dict):
+    from . import auth
+    user = (body.get("username", "") or "").strip()
+    if auth.verify(user, body.get("code", "")):
+        return {"ok": True, "client": user}
+    raise HTTPException(400, "invalid or expired code")
+
+
 @app.get("/api/languages")
 def languages():
     return [{"code": k, "native": v["native"], "sr": v["sr"]} for k, v in LANGUAGES.items()]
