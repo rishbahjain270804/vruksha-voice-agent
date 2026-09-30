@@ -33,6 +33,8 @@
 
   <div id="convo" class="hidden">
     <div class="rule"></div>
+    <div class="dots" id="dots"></div>
+    <div class="thread" id="thread"></div>
     <p class="agent" id="agentText">…</p>
     <div class="orb-wrap">
       <div class="orb" id="orb" data-state="idle">
@@ -169,10 +171,19 @@ $("#begin").onclick = async () => {
 function reveal(el){ el.classList.remove("reveal","in"); void el.offsetWidth; el.classList.add(el.id==="agentText"?"reveal":"in"); }
 function setAgent(text){ const el=$("#agentText"); el.textContent=text; reveal(el); }
 function setHeard(text){ const el=$("#heard"); el.textContent=text; if(text) reveal(el); }
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function renderThread(d){
+  const ans = d.answers || [];
+  $("#thread").innerHTML = ans.map(a=>`<div class="turn"><p class="tq">${esc(a.question)}</p><p class="ta">“${esc(a.transcript)}”</p></div>`).join("");
+  $("#thread").scrollTop = $("#thread").scrollHeight;
+  const n = ans.length, total = Math.min(6, Math.max(4, n+1));
+  $("#dots").innerHTML = Array.from({length:total}, (_,i)=>`<i class="${i<n?'on':(i===n?'cur':'')}"></i>`).join("");
+}
 
 async function runStage(d){
   currentStage = d.stage; lastD = d;
   if(d.stage==="confirm"){ return goConfirm(d); }
+  renderThread(d);
   setAgent(d.say || "…");
   $("#heard").textContent = "";
   show("#skip", true);               // barge-in: interrupt while it's speaking
@@ -221,10 +232,22 @@ async function recordWithSilence(my, finish){
   const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an); const buf=new Uint8Array(an.fftSize);
   let started=false, startAt=0, lastVoiceAt=performance.now(), ended=false;
   listening=true; orb("listen","listening. take your time."); show("#done",true);
+  // live captions: a parallel browser recognizer shows words as you speak (display only).
+  // The accurate, word-for-word transcript still comes from Whisper on the recorded audio.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(SR){ try{
+    recognizer = new SR(); recognizer.lang = srLocale();
+    recognizer.interimResults = true; recognizer.continuous = true; recognizer.maxAlternatives = 1;
+    recognizer.onresult = e => { if(ended||my!==turn) return; let t=""; for(const r of e.results) t+=r[0].transcript;
+      if(t.trim()) $("#heard").textContent = "“" + t.trim() + "”"; };
+    recognizer.onerror = () => {};
+    recognizer.start();
+  }catch(e){ recognizer=null; } }
+  const stopCaptions = () => { try{ if(recognizer){ recognizer.stop(); recognizer=null; } }catch(e){} };
   rec.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
   rec.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); try{ctx.close()}catch(e){};
     finish(new Blob(chunks,{type:"audio/webm"})); };
-  const stop=()=>{ if(ended) return; ended=true; listening=false; show("#done",false);
+  const stop=()=>{ if(ended) return; ended=true; listening=false; show("#done",false); stopCaptions();
     try{rec.stop()}catch(e){ finish(new Blob(chunks,{type:"audio/webm"})); } };
   $("#done").onclick = stop;
   rec.start(250);
