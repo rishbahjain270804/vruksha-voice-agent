@@ -46,7 +46,7 @@ def record_answer(st: ConversationState, transcript: str) -> None:
         st.answers.append(Answer(question=lang_cfg(st.lang)["opener"], transcript=transcript))
         # Did they refer back to earlier work? If so, and we have earlier projects on file,
         # stop and ask WHICH one before going on — the human thing to do.
-        cands = history.recent_topics()
+        cands = history.recent_topics(client=st.client)
         if cands and _BACKREF.search(transcript):
             st.topic_candidates = cands
             st.stage = "pick"
@@ -68,7 +68,7 @@ def _plan(st: ConversationState) -> None:
     if st.continues:              # already tied to a project up front (the 'which one?' step)
         st.stage = "confirm"
     else:                         # maybe it silently continues an earlier log — offer to thread it
-        st.related_topic = history.related(st.draft_content)
+        st.related_topic = history.related(st.draft_content, client=st.client)
         st.stage = "link" if st.related_topic else "confirm"
 
 

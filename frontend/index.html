@@ -235,6 +235,9 @@
 <script>
 const $ = s => document.querySelector(s);
 let lang = "en", sid = null, sttMode = "browser";
+// anonymous per-browser id so this browser's recall stays its own — no login needed
+let CID = "";
+try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID = (crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()); localStorage.setItem("vruksha_cid", CID); } }catch(e){ CID = ""; }
 let recognizer = null, rec = null, chunks = [], listening = false, currentStage = null;
 const show = (el,on)=>$(el).classList.toggle("hidden",!on);
 
@@ -272,7 +275,7 @@ function speak(text){
 }
 
 $("#begin").onclick = async () => {
-  const d = await (await fetch(`/api/session/start?lang=${lang}`, {method:"POST"})).json();
+  const d = await (await fetch(`/api/session/start?lang=${lang}&client=${encodeURIComponent(CID)}`, {method:"POST"})).json();
   sid = d.session_id;
   show("#start",false); show("#convo",true);
   runStage(d);

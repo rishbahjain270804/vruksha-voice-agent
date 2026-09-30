@@ -143,6 +143,7 @@ class Answer(BaseModel):
 
 class ConversationState(BaseModel):
     session_id: str
+    client: str = ""          # anonymous per-browser id, so recall is scoped without a login
     lang: str = DEFAULT_LANG
     stage: Literal["greet", "pick", "ask", "link", "confirm", "posted", "cancelled"] = "greet"
     answers: List[Answer] = []

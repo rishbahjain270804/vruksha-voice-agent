@@ -59,10 +59,10 @@ def languages():
 
 
 @app.post("/api/session/start")
-def start(lang: str = "en"):
+def start(lang: str = "en", client: str = ""):
     lang = lang if lang in LANGUAGES else "en"
     sid = uuid.uuid4().hex[:12]
-    SESSIONS[sid] = ConversationState(session_id=sid, lang=lang, stage="greet")
+    SESSIONS[sid] = ConversationState(session_id=sid, client=(client or "")[:64], lang=lang, stage="greet")
     return _view(SESSIONS[sid])
 
 
@@ -109,7 +109,7 @@ def confirm(sid: str, body: dict):
         log_id = (st.post_result.get("response", {}).get("result", {}) or {}).get("id", "")
     except Exception:
         pass
-    history.record(st.draft_content, st.draft_verb, log_id)
+    history.record(st.draft_content, st.draft_verb, log_id, client=st.client)
     st.stage = "posted"
     return _view(st)
 

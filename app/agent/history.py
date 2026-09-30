@@ -39,7 +39,8 @@ def _ensure(conn) -> None:
     with conn.cursor() as cur:
         cur.execute("""CREATE TABLE IF NOT EXISTS vruksha_logs (
             id bigserial PRIMARY KEY, topic text, keywords jsonb,
-            verb text, snippet text, log_id text, ts timestamptz DEFAULT now())""")
+            verb text, snippet text, log_id text, client text, ts timestamptz DEFAULT now())""")
+        cur.execute("ALTER TABLE vruksha_logs ADD COLUMN IF NOT EXISTS client text")  # for older tables
     conn.commit()
     _TABLE_READY = True
 
@@ -80,27 +81,27 @@ def _load() -> list[dict]:
             with _connect() as conn:
                 _ensure(conn)
                 with conn.cursor() as cur:
-                    cur.execute("SELECT topic, keywords, verb, snippet, log_id, ts "
-                                "FROM vruksha_logs ORDER BY id ASC LIMIT 200")
-                    return [{"topic": t, "keywords": kw or [], "verb": v,
-                             "snippet": s, "id": lid or "", "ts": str(ts) if ts else ""}
-                            for (t, kw, v, s, lid, ts) in cur.fetchall()]
+                    cur.execute("SELECT topic, keywords, verb, snippet, log_id, client, ts "
+                                "FROM vruksha_logs ORDER BY id ASC LIMIT 400")
+                    return [{"topic": t, "keywords": kw or [], "verb": v, "snippet": s,
+                             "id": lid or "", "client": cl or "", "ts": str(ts) if ts else ""}
+                            for (t, kw, v, s, lid, cl, ts) in cur.fetchall()]
         except Exception as e:
             print(f"[history] pg load failed ({e}); using file")
     return _file_load()
 
 
-def record(content: str, verb: str, log_id: str = "", ts: str = "") -> None:
+def record(content: str, verb: str, log_id: str = "", ts: str = "", client: str = "") -> None:
     row = {"topic": topic_of(content), "keywords": sorted(_keywords(content)),
-           "verb": verb, "snippet": content[:90], "id": log_id, "ts": ts}
+           "verb": verb, "snippet": content[:90], "id": log_id, "client": client, "ts": ts}
     if _DB:
         try:
             with _connect() as conn:
                 _ensure(conn)
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO vruksha_logs (topic, keywords, verb, snippet, log_id) "
-                                "VALUES (%s, %s::jsonb, %s, %s, %s)",
-                                (row["topic"], json.dumps(row["keywords"]), verb, row["snippet"], log_id))
+                    cur.execute("INSERT INTO vruksha_logs (topic, keywords, verb, snippet, log_id, client) "
+                                "VALUES (%s, %s::jsonb, %s, %s, %s, %s)",
+                                (row["topic"], json.dumps(row["keywords"]), verb, row["snippet"], log_id, client))
                 conn.commit()
             return
         except Exception as e:
@@ -116,11 +117,16 @@ def topic_of(content: str) -> str:
     return " ".join(kws[:3]) if kws else "your work"
 
 
-def recent_topics(limit: int = 4) -> list[dict]:
-    """The most recent DISTINCT projects the student has logged, newest first.
+def _mine(rows: list[dict], client: str) -> list[dict]:
+    """Only this browser's rows, so one tester's recall never leaks into another's."""
+    return [r for r in rows if (r.get("client") or "") == (client or "")]
+
+
+def recent_topics(limit: int = 4, client: str = "") -> list[dict]:
+    """The most recent DISTINCT projects THIS browser has logged, newest first.
     Used to ask 'which project do you mean?' when they refer back to earlier work."""
     out, seen = [], set()
-    for row in reversed(_load()):
+    for row in reversed(_mine(_load(), client)):
         t = (row.get("topic") or "").strip()
         if t and t.lower() not in seen:
             seen.add(t.lower()); out.append(row)
@@ -161,13 +167,13 @@ def match_topic(said: str, candidates: list[dict]) -> Optional[dict]:
     return None
 
 
-def related(content: str, min_overlap: int = 1) -> Optional[dict]:
-    """Return the most-recent past log that shares a keyword with this answer, else None.
+def related(content: str, min_overlap: int = 1, client: str = "") -> Optional[dict]:
+    """Return the most-recent past log (THIS browser's) that shares a keyword with this answer.
     Threshold is 1 on purpose: asking 'is this the same X?' is cheap and the student can say no,
     so a near-miss that offers to thread is better UX than silently starting a disconnected log."""
     now = _keywords(content)
     best, best_score = None, 0
-    for row in reversed(_load()):          # most recent first
+    for row in reversed(_mine(_load(), client)):   # most recent first
         overlap = len(now & set(row.get("keywords", [])))
         if overlap >= min_overlap and overlap > best_score:
             best, best_score = row, overlap

@@ -109,3 +109,4 @@ frontend/index.html     the hands-free UI (turn-taking, confirm, Proof theme)
 - Transcription is only as good as the model; proper nouns can still slip. A vocabulary hint biases
   spelling, but word-for-word is preserved — it never adds words you didn't say.
 - The keyless rule planner references your words but cannot truly reason; the Groq planner is the real one.
+- There's no login, so recall is scoped by an **anonymous per-browser id** (a random localStorage value) — each browser sees only its own "which project?" memory. True cross-device identity would use per-user Proof auth (the connector supports OAuth); this keeps the demo login-free while still separating testers.
