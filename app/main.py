@@ -129,6 +129,7 @@ def tts(text: str, lang: str = "en"):
 
 @app.get("/healthz")
 def health():
+    from .agent import history
     return {"ok": True, "dry_run": os.getenv("PROOF_DRY_RUN", "1") != "0",
             "stt": os.getenv("STT_PROVIDER", "browser"), "llm": os.getenv("LLM_PROVIDER", "rule"),
-            "tts": os.getenv("TTS_PROVIDER", "browser")}
+            "tts": os.getenv("TTS_PROVIDER", "browser"), "db": history.db_status()}

@@ -44,6 +44,21 @@ def _ensure(conn) -> None:
     _TABLE_READY = True
 
 
+def db_status() -> str:
+    """For /healthz: 'postgres' if the DB is wired and reachable, else 'file' (with the reason)."""
+    if not _DB:
+        return "file (no DATABASE_URL)"
+    try:
+        with _connect() as conn:
+            _ensure(conn)
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM vruksha_logs")
+                n = cur.fetchone()[0]
+        return f"postgres ({n} logs)"
+    except Exception as e:
+        return f"file (pg error: {str(e)[:60]})"
+
+
 def _file_load() -> list[dict]:
     try:
         return json.loads(_STORE.read_text(encoding="utf-8"))
