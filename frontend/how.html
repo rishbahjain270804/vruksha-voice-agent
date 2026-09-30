@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works — Vruksha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="/app.css" rel="stylesheet">
+</head>
+<body>
+<nav class="nav">
+  <a class="brand" href="/"><span class="dot"></span> Vruksha</a>
+  <div class="navlinks"><a href="/how" class="active">How it works</a><a href="/talk">Talk</a><a href="/account">Account</a></div>
+</nav>
+
+<div class="sheet wide">
+  <div class="eyebrow"><span class="dot"></span> How it works <span class="dot"></span></div>
+  <h1>The <span class="b">why</span>, not the what.</h1>
+  <p class="lede">A voice agent that logs your engineering day to Proof — designed around one rule and one insight.</p>
+
+  <div class="content">
+    <h2>The one rule</h2>
+    <p><b>The model never touches your transcript.</b> Speech-to-text produces your raw words; they're stored unchanged and are exactly what gets posted. The language model only ever <i>reads</i> them — to pick the next question and to label the verb. That boundary is enforced in code, not by convention: the conversation engine owns the transcripts and is the only thing that can write them.</p>
+
+    <h2>The interview</h2>
+    <p>There's one fixed opener — <i>"what did you work on today?"</i> Everything after is <b>generated</b>. After each answer the planner reads the whole conversation and asks the single best next question, following your thread and quoting your own words. It decides on its own when it has enough.</p>
+    <p>It's steered toward what a strong log needs, drawn from Proof's public corpus: <b>a reason</b> next to the decision, <b>the alternative</b> you chose it over, and <b>one honest thing</b> — what you skipped, what it cost, or a mistake. 19% of picked logs name an alternative, 34% fill that honest line, 53% name a concrete artefact. So the agent draws those out — in your words.</p>
+
+    <h2>Turn-taking</h2>
+    <p>It waits while you think — a pause doesn't cut you off — reads its question aloud, and won't talk over you. You can tap <b>I'm done</b> to end a turn, or type instead.</p>
+
+    <h2>Ten languages</h2>
+    <p>English, Tamil, Hindi, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi. The question, the transcription, and the voice all follow the language you pick.</p>
+
+    <h2>Your memory, your identity</h2>
+    <p>Recall of your past projects is scoped to you. By default that's an anonymous per-browser key; pair an authenticator app (TOTP) once and your history follows you to any device — <b>no password, no email, no SMS</b>. The rotating 6-digit code is only ever verified, never stored.</p>
+
+    <h2>The stack</h2>
+    <p class="small">FastAPI · Groq Whisper large-v3 (speech) · gpt-oss-120b (the adaptive planner) · ElevenLabs (voice) · Postgres (recall) · posts to Proof via its MCP connector. Runs at zero key-cost in a browser-only fallback; upgrades with keys.</p>
+  </div>
+
+  <div class="row center" style="margin-top:28px">
+    <a class="button primary" href="/talk" style="padding:13px 26px">Try it — start talking</a>
+  </div>
+</div>
+</body>
+</html>

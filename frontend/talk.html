@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talk — Vruksha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="/app.css" rel="stylesheet">
+</head>
+<body>
+<nav class="nav">
+  <a class="brand" href="/"><span class="dot"></span> Vruksha</a>
+  <div class="navlinks"><a href="/how">How it works</a><a href="/talk" class="active">Talk</a><a href="/account">Account</a></div>
+</nav>
+
+<div class="sheet">
+  <div class="eyebrow"><span class="dot"></span> Voice Log for Proof <span class="dot"></span></div>
+  <h1>Speak your <span class="b">proof</span>.</h1>
+  <p class="lede">Two minutes, out loud. It writes down what you said — your words, not a summary, not cleaned up.</p>
+
+  <div id="start">
+    <div class="rule"></div>
+    <div class="row between">
+      <span class="label">Speak in</span>
+      <div class="row" id="langPicker"></div>
+    </div>
+    <p class="lede" style="margin:18px auto 20px">Hands-free. It asks, waits while you think, asks one thing back, and reads it out. Nothing posts until you say so.</p>
+    <button id="begin" class="primary wide" style="padding:14px">Start talking</button>
+    <p class="hint">Memory: <span id="memWho">this browser</span> · <a href="/account">manage</a></p>
+  </div>
+
+  <div id="convo" class="hidden">
+    <div class="rule"></div>
+    <p class="agent" id="agentText">…</p>
+    <div class="orb-wrap">
+      <div class="orb" id="orb" data-state="idle">
+        <svg class="ic ic-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+        <svg class="ic ic-wave" viewBox="0 0 24 24"><path d="M4 9v6"/><path d="M8 5v14"/><path d="M12 8v8"/><path d="M16 4v16"/><path d="M20 9v6"/></svg>
+        <svg class="ic ic-think" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+      </div>
+      <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
+    <p class="state" id="state">…</p>
+    <p class="heard" id="heard"></p>
+    <div class="row center" style="margin-top:14px">
+      <button id="done" class="primary hidden">I'm done</button>
+    </div>
+    <div class="row center" style="margin-top:10px">
+      <button id="redo" class="ghost">↺ again</button>
+      <button id="typeToggle" class="ghost">⌨ type it</button>
+    </div>
+    <div id="typeBox" class="hidden" style="margin-top:12px">
+      <textarea id="typed" placeholder="type it instead"></textarea>
+      <button id="sendTyped" class="pill">Send →</button>
+    </div>
+  </div>
+
+  <div id="confirm" class="hidden">
+    <div class="rule"></div>
+    <p class="label" style="text-align:center;margin-bottom:14px">Your words, unedited · nothing added</p>
+    <div class="entry">
+      <span class="verb" id="cVerb">log</span>
+      <p class="what" id="cContent"></p>
+      <p class="why" id="whyLine"><span class="kw">because</span> <span id="cWhy"></span></p>
+    </div>
+    <p class="state" id="confirmState" style="margin-top:14px">it goes on your public record · say yes, or no to bin it</p>
+    <div class="row center" style="margin-top:14px">
+      <button id="yes" class="good">Yes, post it</button>
+      <button id="no" class="bad">No, bin it</button>
+    </div>
+  </div>
+
+  <div id="finish" class="hidden">
+    <div class="rule"></div>
+    <p class="agent" id="doneMsg" style="min-height:0"></p>
+    <pre class="result" id="result"></pre>
+    <button id="again" class="primary wide" style="margin-top:16px">Start another</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let lang = "en", sid = null, sttMode = "browser";
+function genCode(){ const a="abcdefghjkmnpqrstuvwxyz23456789"; let s=""; for(let i=0;i<8;i++){ if(i===4)s+="-"; s+=a[Math.floor(Math.random()*a.length)]; } return s; }
+let CID = "";
+try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID = genCode(); localStorage.setItem("vruksha_cid", CID); } }catch(e){ CID = genCode(); }
+let USER = ""; try{ USER = localStorage.getItem("vruksha_user") || ""; if(USER) CID = USER; }catch(e){}
+$("#memWho").textContent = USER ? "@"+USER : "this browser";
+let recognizer = null, rec = null, chunks = [], listening = false, currentStage = null;
+const show = (el,on)=>$(el).classList.toggle("hidden",!on);
+
+let LANGS = [{code:"en",native:"English",sr:"en-US"}];
+const srLocale = () => (LANGS.find(x=>x.code===lang)||LANGS[0]).sr || "en-US";
+function setLang(l){ lang=l; document.querySelectorAll("#langPicker button").forEach(b=>b.classList.toggle("primary", b.dataset.code===l)); }
+function renderLangs(){
+  const box=$("#langPicker"); box.innerHTML="";
+  LANGS.forEach(L=>{ const b=document.createElement("button"); b.className="pill"; b.dataset.code=L.code;
+    b.textContent=L.native; b.onclick=()=>setLang(L.code); box.appendChild(b); });
+  setLang(LANGS.some(x=>x.code===lang)?lang:LANGS[0].code);
+}
+fetch("/api/languages").then(r=>r.json()).then(list=>{ if(list&&list.length){ LANGS=list; renderLangs(); } }).catch(()=>renderLangs());
+
+function orb(mode, label){
+  const state = ["speak","listen","think"].includes(mode) ? mode : "idle";
+  $("#orb").dataset.state = state; $("#state").textContent = label;
+}
+
+function speak(text){
+  return new Promise(async resolve => {
+    if(!text) return resolve();
+    orb("speak","saying it");
+    try{
+      const r = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
+      if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); a.onended=resolve; a.onerror=resolve; return a.play().catch(resolve); }
+    }catch(e){}
+    try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=srLocale();
+         u.onend=resolve; u.onerror=resolve; speechSynthesis.speak(u);
+         setTimeout(resolve, Math.min(12000, 1500+text.length*70));
+    }catch(e){ resolve(); }
+  });
+}
+
+$("#begin").onclick = async () => {
+  const d = await (await fetch(`/api/session/start?lang=${lang}&client=${encodeURIComponent(CID)}`, {method:"POST"})).json();
+  sid = d.session_id;
+  show("#start",false); show("#convo",true);
+  runStage(d);
+};
+
+function reveal(el){ el.classList.remove("reveal","in"); void el.offsetWidth; el.classList.add(el.id==="agentText"?"reveal":"in"); }
+function setAgent(text){ const el=$("#agentText"); el.textContent=text; reveal(el); }
+function setHeard(text){ const el=$("#heard"); el.textContent=text; if(text) reveal(el); }
+
+async function runStage(d){
+  currentStage = d.stage;
+  if(d.stage==="confirm"){ return goConfirm(d); }
+  setAgent(d.say || "…");
+  $("#heard").textContent = "";
+  await speak(d.say);
+  autoListen(text => sendAnswer(text, null));
+}
+
+function autoListen(onFinal){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(sttMode==="browser" && SR){
+    recognizer = new SR(); recognizer.lang = srLocale();
+    recognizer.interimResults = true; recognizer.continuous = false; recognizer.maxAlternatives = 1;
+    let finalText = "";
+    listening = true; orb("listen","listening. just talk.");
+    recognizer.onresult = e => {
+      let interim=""; finalText="";
+      for(const r of e.results){ (r.isFinal ? finalText+=r[0].transcript : interim+=r[0].transcript); }
+      $("#heard").textContent = "“" + (finalText||interim) + "”";
+    };
+    recognizer.onend = () => {
+      listening=false;
+      if(finalText.trim()){ orb("think","thinking"); onFinal(finalText.trim()); }
+      else { orb("listen","didn’t catch that. talk, or tap ↺."); }
+    };
+    recognizer.onerror = () => { listening=false; orb("","tap ↺ to try again."); };
+    recognizer.start();
+    return;
+  }
+  recordWithSilence(blob => { orb("think","writing it down"); onFinal_audio = onFinal; sendAnswer("", blob); });
+}
+let onFinal_audio = null;
+
+const SILENCE_MS = 2200, MIN_SPEECH_MS = 900, GRACE_MS = 6000;
+
+async function recordWithSilence(finish){
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  rec = new MediaRecorder(stream); chunks=[];
+  const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(stream);
+  const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an); const buf=new Uint8Array(an.fftSize);
+  let started=false, startAt=0, lastVoiceAt=performance.now(), ended=false;
+  listening=true; orb("listen","listening. take your time."); show("#done",true);
+  rec.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); try{ctx.close()}catch(e){};
+    finish(new Blob(chunks,{type:"audio/webm"})); };
+  const stop=()=>{ if(ended) return; ended=true; listening=false; show("#done",false);
+    try{rec.stop()}catch(e){ finish(new Blob(chunks,{type:"audio/webm"})); } };
+  $("#done").onclick = stop;
+  rec.start(250);
+  const tick=()=>{ if(ended) return; an.getByteTimeDomainData(buf);
+    let peak=0; for(const v of buf) peak=Math.max(peak,Math.abs(v-128));
+    const now=performance.now();
+    if(peak>10){ if(!started){started=true;startAt=now;} lastVoiceAt=now; orb("listen","listening…"); }
+    const quietFor = now-lastVoiceAt;
+    if(started){
+      const spokeEnough = (lastVoiceAt-startAt) > MIN_SPEECH_MS;
+      if(spokeEnough && quietFor > SILENCE_MS){ return stop(); }
+      if(quietFor > 800 && quietFor <= SILENCE_MS) orb("listen","(paused. still here.)");
+    } else if(now-lastVoiceAt > GRACE_MS){
+      orb("listen","no rush. tap I’m done when ready.");
+    }
+    requestAnimationFrame(tick);
+  }; requestAnimationFrame(tick);
+}
+
+$("#redo").onclick = () => { if(listening) return; if(currentStage==="confirm"){ orb("listen","say yes or no"); autoListen(t=>sendConfirm(t)); } else { autoListen(t=>sendAnswer(t,null)); } };
+$("#typeToggle").onclick = () => { $("#typeBox").classList.toggle("hidden"); };
+$("#sendTyped").onclick = () => { const t=$("#typed").value.trim(); if(!t) return; $("#typed").value=""; show("#typeBox",false); $("#heard").textContent="“"+t+"”"; (currentStage==="confirm"?sendConfirm(t):sendAnswer(t,null)); };
+
+async function sendAnswer(text, blob){
+  if(recognizer){ try{recognizer.abort()}catch(e){} }
+  const fd = new FormData();
+  if(text) fd.append("transcript", text);
+  if(blob) fd.append("audio", blob, "a.webm");
+  const r = await fetch(`/api/session/${sid}/answer`, {method:"POST", body:fd});
+  if(!r.ok){ orb("","that broke. tap ↺."); $("#heard").textContent=(await r.json()).detail||"error"; return; }
+  const d = await r.json();
+  if(d.transcript) setHeard("“" + d.transcript + "”");
+  orb("think","got it");
+  setTimeout(()=>runStage(d), 1100);
+}
+
+function goConfirm(d){
+  show("#convo",false); show("#confirm",true);
+  const v=(d.draft.verb||"log").toLowerCase();
+  $("#cVerb").textContent=v; $("#cVerb").className="verb "+v;
+  $("#cContent").textContent=d.draft.content;
+  const why=(d.draft.why||"").trim();
+  $("#cWhy").textContent=why; show("#whyLine", !!why);
+  speak(d.say).then(()=>autoListen(t=>sendConfirm(t)));
+}
+$("#yes").onclick = () => sendConfirm("yes, post it");
+$("#no").onclick  = () => sendConfirm("no");
+async function sendConfirm(utterance){
+  if(recognizer){ try{recognizer.abort()}catch(e){} }
+  const d = await (await fetch(`/api/session/${sid}/confirm`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({utterance})})).json();
+  if(d.needs==="confirm"){ $("#confirmState").textContent="yes, or no."; autoListen(t=>sendConfirm(t)); return; }
+  show("#confirm",false); show("#finish",true);
+  const posted = d.stage==="posted";
+  $("#doneMsg").textContent = posted ? "In the record." : "Not posted. Nothing lost.";
+  $("#result").textContent = JSON.stringify(d.post_result||{message:"cancelled"}, null, 2);
+  speak(posted ? (lang==="ta"?"பதிவு செய்யப்பட்டது":"Posted to your record.") : (lang==="ta"?"பதிவு செய்யவில்லை":"Okay, not posted."));
+}
+$("#again").onclick = () => location.reload();
+
+fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt; }).catch(()=>{});
+</script>
+</body>
+</html>

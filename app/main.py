@@ -26,7 +26,12 @@ from .proof.client import post_log
 
 app = FastAPI(title="SPEAKLOG")
 SESSIONS: dict[str, ConversationState] = {}
-FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "index.html"
+FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
+
+
+def _page(name: str) -> HTMLResponse:
+    f = FRONTEND / name
+    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else f"<h1>{name} missing</h1>")
 
 
 def _get(sid: str) -> ConversationState:
@@ -49,8 +54,35 @@ def _view(st: ConversationState) -> dict:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index():
-    return FRONTEND.read_text(encoding="utf-8") if FRONTEND.exists() else "<h1>frontend/index.html missing</h1>"
+def home():
+    return _page("home.html")
+
+
+@app.get("/talk", response_class=HTMLResponse)
+def talk():
+    return _page("talk.html")
+
+
+@app.get("/how", response_class=HTMLResponse)
+def how():
+    return _page("how.html")
+
+
+@app.get("/account", response_class=HTMLResponse)
+def account():
+    return _page("account.html")
+
+
+@app.get("/app.css")
+def app_css():
+    f = FRONTEND / "app.css"
+    return Response(content=f.read_text(encoding="utf-8") if f.exists() else "", media_type="text/css")
+
+
+@app.get("/api/logs")
+def api_logs(client: str = ""):
+    from .agent import history
+    return history.list_logs((client or "")[:64])
 
 
 @app.post("/api/auth/setup")

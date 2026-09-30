@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account — Vruksha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="/app.css" rel="stylesheet">
+</head>
+<body>
+<nav class="nav">
+  <a class="brand" href="/"><span class="dot"></span> Vruksha</a>
+  <div class="navlinks"><a href="/how">How it works</a><a href="/talk">Talk</a><a href="/account" class="active">Account</a></div>
+</nav>
+
+<div class="sheet">
+  <div class="eyebrow"><span class="dot"></span> Account <span class="dot"></span></div>
+  <h1>Your <span class="b">memory</span>.</h1>
+  <p class="lede">Pair an authenticator app once, and your history follows you to any device — no password, no email.</p>
+
+  <div class="rule"></div>
+  <div class="row between">
+    <span class="label">Signed in as</span>
+    <span id="memWho" class="memwho">this browser</span>
+  </div>
+  <div class="row center" style="margin-top:10px;gap:14px">
+    <button id="acctSetup" class="ghost">set up a code</button>
+    <button id="acctConnect" class="ghost">connect on this device</button>
+    <button id="acctForget" class="ghost hidden">sign out here</button>
+  </div>
+  <div id="acctPanel" class="hidden"></div>
+  <p class="hint">an authenticator code (Google Authenticator / Authy) is the whole login — nothing else to remember</p>
+
+  <div class="rule"></div>
+  <p class="label" style="margin-bottom:6px">Your recent logs</p>
+  <div id="logs"><p class="hint" style="text-align:left;margin-top:6px">loading…</p></div>
+  <div class="row center" style="margin-top:20px">
+    <a class="button primary" href="/talk" style="padding:12px 24px">Add today's log</a>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const show = (el,on)=>$(el).classList.toggle("hidden",!on);
+function genCode(){ const a="abcdefghjkmnpqrstuvwxyz23456789"; let s=""; for(let i=0;i<8;i++){ if(i===4)s+="-"; s+=a[Math.floor(Math.random()*a.length)]; } return s; }
+let CID="", USER="";
+try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID=genCode(); localStorage.setItem("vruksha_cid",CID);} }catch(e){ CID=genCode(); }
+try{ USER = localStorage.getItem("vruksha_user") || ""; if(USER) CID=USER; }catch(e){}
+
+function setMemLabel(){ $("#memWho").textContent = USER ? "@"+USER : "this browser"; show("#acctForget", !!USER); }
+function acctClose(){ show("#acctPanel", false); $("#acctPanel").innerHTML=""; }
+function setConnected(u){ USER=u; CID=u; try{localStorage.setItem("vruksha_user",u);}catch(e){} setMemLabel(); acctClose(); loadLogs(); }
+async function postJSON(url, body){ return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+setMemLabel();
+
+$("#acctForget").onclick = () => { try{localStorage.removeItem("vruksha_user");}catch(e){} USER=""; try{CID=localStorage.getItem("vruksha_cid")||genCode();}catch(e){} setMemLabel(); loadLogs(); };
+
+$("#acctSetup").onclick = () => {
+  const p=$("#acctPanel"); show("#acctPanel",true);
+  p.innerHTML = `<div class="acctbox">
+    <p class="step">Pick a username. You'll scan a QR into your authenticator app, so your memory follows you anywhere.</p>
+    <input id="suUser" placeholder="username (3–32 chars)" autocomplete="off">
+    <button id="suCreate" class="primary wide">Create code</button>
+    <p class="acctmsg" id="suMsg"></p></div>`;
+  $("#suCreate").onclick = async () => {
+    const u=$("#suUser").value.trim(), m=$("#suMsg"); m.className="acctmsg"; m.textContent="creating…";
+    try{
+      const r=await postJSON("/api/auth/setup",{username:u});
+      if(!r.ok){ m.className="acctmsg err"; m.textContent=(await r.json()).detail||"failed"; return; }
+      const {otpauth}=await r.json();
+      p.innerHTML = `<div class="acctbox">
+        <p class="step">Scan this in Google Authenticator or Authy, then enter the 6-digit code it shows.</p>
+        <div id="qrbox"></div>
+        <input id="suCode" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code">
+        <button id="suVerify" class="primary wide">Verify &amp; connect</button>
+        <p class="acctmsg" id="suMsg2"></p></div>`;
+      try{ new QRCode(document.getElementById("qrbox"), {text: otpauth, width:176, height:176}); }
+      catch(e){ $("#qrbox").textContent = otpauth; }
+      $("#suVerify").onclick = async () => {
+        const code=$("#suCode").value.trim(), m2=$("#suMsg2"); m2.className="acctmsg"; m2.textContent="verifying…";
+        const vr=await postJSON("/api/auth/verify",{username:u,code});
+        if(vr.ok){ m2.className="acctmsg ok"; m2.textContent="connected as @"+u; setTimeout(()=>setConnected(u),700); }
+        else { m2.className="acctmsg err"; m2.textContent="that code didn't match — enter the current one"; }
+      };
+    }catch(e){ m.className="acctmsg err"; m.textContent="network error"; }
+  };
+};
+
+$("#acctConnect").onclick = () => {
+  const p=$("#acctPanel"); show("#acctPanel",true);
+  p.innerHTML = `<div class="acctbox">
+    <p class="step">Enter your username and the current 6-digit code from your authenticator.</p>
+    <input id="cnUser" placeholder="username" autocomplete="off">
+    <input id="cnCode" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code">
+    <button id="cnGo" class="primary wide">Connect</button>
+    <p class="acctmsg" id="cnMsg"></p></div>`;
+  $("#cnGo").onclick = async () => {
+    const u=$("#cnUser").value.trim(), code=$("#cnCode").value.trim(), m=$("#cnMsg"); m.className="acctmsg"; m.textContent="connecting…";
+    const r=await postJSON("/api/auth/verify",{username:u,code});
+    if(r.ok){ m.className="acctmsg ok"; m.textContent="connected as @"+u; setTimeout(()=>setConnected(u),700); }
+    else { m.className="acctmsg err"; m.textContent="invalid username or code"; }
+  };
+};
+
+function esc(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+async function loadLogs(){
+  const box=$("#logs"); box.innerHTML='<p class="hint" style="text-align:left;margin-top:6px">loading…</p>';
+  try{
+    const rows = await (await fetch(`/api/logs?client=${encodeURIComponent(CID)}`)).json();
+    if(!rows.length){ box.innerHTML='<p class="hint" style="text-align:left;margin-top:6px">No logs yet on this identity. Start one and it shows up here.</p>'; return; }
+    box.innerHTML = rows.map(r=>{
+      const v=(r.verb||"log").toLowerCase();
+      const when = r.ts ? String(r.ts).slice(0,10) : "";
+      return `<div class="logitem"><div class="top"><span class="verb ${v}">${esc(v)}</span><span class="when">${esc(when)}</span></div>
+        <p class="snip">${esc(r.snippet||r.topic||"")}</p></div>`;
+    }).join("");
+  }catch(e){ box.innerHTML='<p class="acctmsg err">could not load logs</p>'; }
+}
+loadLogs();
+</script>
+</body>
+</html>

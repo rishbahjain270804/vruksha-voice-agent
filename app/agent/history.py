@@ -122,6 +122,11 @@ def _mine(rows: list[dict], client: str) -> list[dict]:
     return [r for r in rows if (r.get("client") or "") == (client or "")]
 
 
+def list_logs(client: str, limit: int = 20) -> list[dict]:
+    """This identity's logs, newest first, for the Account page's 'your recent logs' list."""
+    return list(reversed(_mine(_load(), client)))[:limit]
+
+
 def recent_topics(limit: int = 4, client: str = "") -> list[dict]:
     """The most recent DISTINCT projects THIS browser has logged, newest first.
     Used to ask 'which project do you mean?' when they refer back to earlier work."""
