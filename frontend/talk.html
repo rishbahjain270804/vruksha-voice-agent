@@ -282,5 +282,11 @@ $("#stop").onclick = stopConvo;
 
 fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt; }).catch(()=>{});
 </script>
+<nav class="mnav">
+  <a href="/"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Home</span></a>
+  <a href="/how"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>How</span></a>
+  <a href="/talk" class="active"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/></svg><span>Talk</span></a>
+  <a href="/account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Account</span></a>
+</nav>
 </body>
 </html>
