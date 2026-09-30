@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Optional
 
 _STORE = Path(__file__).resolve().parent.parent.parent / "sessions.json"
+_DB = os.getenv("DATABASE_URL", "").strip()   # Render Postgres when set; JSON file otherwise
+_TABLE_READY = False
 _STOP = set("the a an i we to of and or but so it that this for on in with was were is are be been my "
             "today tried trying built build make made using use used because able did do done my me you "
             "not no yes".split())
@@ -20,7 +22,29 @@ def _keywords(text: str) -> set[str]:
     return {w.lower() for w in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{3,}", text or "") if w.lower() not in _STOP}
 
 
-def _load() -> list[dict]:
+# ---- storage: Postgres (persists across Render deploys) with a JSON-file fallback ----
+
+def _connect():
+    import psycopg
+    dsn = _DB
+    if dsn.startswith("postgres://"):            # normalise the scheme psycopg expects
+        dsn = "postgresql://" + dsn[len("postgres://"):]
+    return psycopg.connect(dsn, connect_timeout=10)
+
+
+def _ensure(conn) -> None:
+    global _TABLE_READY
+    if _TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""CREATE TABLE IF NOT EXISTS vruksha_logs (
+            id bigserial PRIMARY KEY, topic text, keywords jsonb,
+            verb text, snippet text, log_id text, ts timestamptz DEFAULT now())""")
+    conn.commit()
+    _TABLE_READY = True
+
+
+def _file_load() -> list[dict]:
     try:
         return json.loads(_STORE.read_text(encoding="utf-8"))
     except Exception:
@@ -31,13 +55,43 @@ def _save(rows: list[dict]) -> None:
     try:
         _STORE.write_text(json.dumps(rows[-100:], ensure_ascii=False, indent=1), encoding="utf-8")
     except Exception as e:
-        print(f"[history] save failed: {e}")
+        print(f"[history] file save failed: {e}")
+
+
+def _load() -> list[dict]:
+    """All stored logs, oldest first. Postgres when configured, else the JSON file."""
+    if _DB:
+        try:
+            with _connect() as conn:
+                _ensure(conn)
+                with conn.cursor() as cur:
+                    cur.execute("SELECT topic, keywords, verb, snippet, log_id, ts "
+                                "FROM vruksha_logs ORDER BY id ASC LIMIT 200")
+                    return [{"topic": t, "keywords": kw or [], "verb": v,
+                             "snippet": s, "id": lid or "", "ts": str(ts) if ts else ""}
+                            for (t, kw, v, s, lid, ts) in cur.fetchall()]
+        except Exception as e:
+            print(f"[history] pg load failed ({e}); using file")
+    return _file_load()
 
 
 def record(content: str, verb: str, log_id: str = "", ts: str = "") -> None:
-    rows = _load()
-    rows.append({"topic": topic_of(content), "keywords": sorted(_keywords(content)),
-                 "verb": verb, "snippet": content[:90], "id": log_id, "ts": ts})
+    row = {"topic": topic_of(content), "keywords": sorted(_keywords(content)),
+           "verb": verb, "snippet": content[:90], "id": log_id, "ts": ts}
+    if _DB:
+        try:
+            with _connect() as conn:
+                _ensure(conn)
+                with conn.cursor() as cur:
+                    cur.execute("INSERT INTO vruksha_logs (topic, keywords, verb, snippet, log_id) "
+                                "VALUES (%s, %s::jsonb, %s, %s, %s)",
+                                (row["topic"], json.dumps(row["keywords"]), verb, row["snippet"], log_id))
+                conn.commit()
+            return
+        except Exception as e:
+            print(f"[history] pg insert failed ({e}); using file")
+    rows = _file_load()
+    rows.append(row)
     _save(rows)
 
 

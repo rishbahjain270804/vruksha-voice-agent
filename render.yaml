@@ -1,5 +1,13 @@
 # One-click deploy on Render (free). New + → Blueprint → connect this repo → fill the 3 secrets.
 # Always-on HTTPS URL the Vruksha team can test without installing anything.
+# The free Postgres below is auto-created and wired to DATABASE_URL, so project recall
+# persists across deploys (with a JSON-file fallback when no DB is present).
+databases:
+  - name: vruksha-db
+    plan: free
+    databaseName: vruksha
+    user: vruksha
+
 services:
   - type: web
     name: vruksha-voice-agent
@@ -7,11 +15,15 @@ services:
     plan: free
     # Lean runtime deps only: STT=groq and TTS=elevenlabs need no local models,
     # so we skip faster-whisper / edge-tts here to keep the build small and fast.
-    buildCommand: pip install fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq
+    buildCommand: pip install fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq "psycopg[binary]"
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vruksha-db
+          property: connectionString
       - key: PROOF_DRY_RUN
         value: "1"                 # keep dry-run on the public demo so no one can post to your record
       - key: STT_PROVIDER
