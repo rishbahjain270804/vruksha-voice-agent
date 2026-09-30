@@ -7,9 +7,8 @@ RUN pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart pyda
 COPY app ./app
 COPY frontend ./frontend
 
-# Non-secret defaults; the 3 real keys are set as Space secrets, never baked in.
-ENV PROOF_DRY_RUN=1 \
-    STT_PROVIDER=groq \
+# Non-secret defaults; keys are set as secrets, never baked in. No PROOF_TOKEN: posting is per-user.
+ENV STT_PROVIDER=groq \
     LLM_PROVIDER=groq \
     GROQ_MODEL=openai/gpt-oss-120b \
     TTS_PROVIDER=elevenlabs \

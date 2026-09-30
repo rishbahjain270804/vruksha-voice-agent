@@ -73,17 +73,18 @@ by **meaning**, not position:
 | `LLM_PROVIDER` | `rule` | `groq` (adaptive planner) or `gemini` |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | any chat model your key has |
 | `TTS_PROVIDER` | `browser` | `edge` (neural, free; needs Bing reachable) |
-| `PROOF_DRY_RUN` | `1` (print JSON only) | `0` (actually POST — needs `PROOF_TOKEN`) |
 
 A free Groq key (console.groq.com, no card) turns on both the adaptive planner and Whisper STT. If Groq
 STT fails mid-session, it falls back to local Whisper so a network drop never strands the speaker.
 
-## The Proof token — read this
+## Posting is per-user — no server token
 
-Create it at `proof.zeromaintenanceengineer.in/settings/mcp`. It posts **only to your own record**, is
-capped at **20 posts/day**, and must never be committed — it lives in `.env`, which is gitignored. Keep
-`PROOF_DRY_RUN=1` while developing so the cap is never touched by accident; flip to `0` only for a
-deliberate, confirmed test post.
+Each person connects **their own** Proof token on the portal (Account page → Connect Proof, authorized
+with their authenticator code). A confirmed log then posts to **that person's** record, using **their**
+token. The app **never** posts with a server or owner token, so no one's log can land on someone else's
+record — and there is no `PROOF_TOKEN` in the environment. Without a connected token, a log is just
+drafted and shown back (nothing is posted). Create a token at
+`proof.zeromaintenanceengineer.in/settings/mcp`; note the **20-posts/day** cap.
 
 ## Architecture
 

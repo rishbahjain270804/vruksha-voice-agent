@@ -6,14 +6,13 @@
 #   export DOMAIN=yourname.duckdns.org
 #   export GROQ_API_KEY=gsk_...
 #   export ELEVENLABS_API_KEY=sk_...
-#   export PROOF_TOKEN=proof_mcp_...
 #   curl -fsSL https://raw.githubusercontent.com/rishbahjain270804/vruksha-voice-agent/master/deploy/oracle-setup.sh | sudo -E bash
+# Posting is per-user (each user enters their own Proof token on the portal) — no server token needed.
 set -euo pipefail
 
 : "${DOMAIN:?set DOMAIN (e.g. yourname.duckdns.org)}"
 : "${GROQ_API_KEY:?set GROQ_API_KEY}"
 : "${ELEVENLABS_API_KEY:?set ELEVENLABS_API_KEY}"
-: "${PROOF_TOKEN:?set PROOF_TOKEN}"
 
 REPO=https://github.com/rishbahjain270804/vruksha-voice-agent.git
 APP=/opt/vruksha
@@ -37,8 +36,6 @@ python3 -m venv "$APP/.venv"
 
 echo "== env =="
 cat > "$APP/.env" <<ENV
-PROOF_DRY_RUN=1
-PROOF_TOKEN=${PROOF_TOKEN}
 PROOF_BASE=https://proof.zeromaintenanceengineer.in
 STT_PROVIDER=groq
 GROQ_API_KEY=${GROQ_API_KEY}

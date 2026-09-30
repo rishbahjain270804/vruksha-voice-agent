@@ -26,19 +26,15 @@ def _payload(verb: str, content: str, why: str, evidence_url: str = "") -> dict:
 
 
 def post_log(verb: str, content: str, why: str, evidence_url: str = "", token: str | None = None) -> dict:
-    """Post one log, or, in dry-run, return the payload that WOULD be sent.
-    If `token` is given (a signed-in user's own Proof token), post to THEIR record for real,
-    regardless of the global dry-run switch; otherwise fall back to env token + dry-run rules."""
+    """Post one log — but ONLY with the USER'S OWN token, which they entered on the portal.
+    A log posts to whoever owns `token`. With no token we return the draft (dry-run) and post
+    nothing: we never fall back to a server/owner token, so no one's log lands on someone else's
+    record. The server's own PROOF_TOKEN is not read here."""
     base = os.getenv("PROOF_BASE", "https://proof.zeromaintenanceengineer.in")
     body = _payload(verb, content, why, evidence_url)
-    if token:
-        token, dry = token.strip(), False
-    else:
-        token = os.getenv("PROOF_TOKEN", "").strip()
-        dry = os.getenv("PROOF_DRY_RUN", "1") != "0"
-
-    if dry or not token:
-        return {"dry_run": True, "reason": "PROOF_DRY_RUN" if dry else "no PROOF_TOKEN",
+    token = (token or "").strip()
+    if not token:
+        return {"dry_run": True, "reason": "no user token — connect Proof to post to your record",
                 "would_send": body, "endpoint": f"{base}/api/mcp"}
 
     try:

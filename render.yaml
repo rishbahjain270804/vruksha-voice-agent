@@ -24,8 +24,6 @@ services:
         fromDatabase:
           name: vruksha-db
           property: connectionString
-      - key: PROOF_DRY_RUN
-        value: "1"                 # keep dry-run on the public demo so no one can post to your record
       - key: STT_PROVIDER
         value: groq
       - key: LLM_PROVIDER
@@ -42,10 +40,9 @@ services:
         value: en
       - key: PYTHON_VERSION
         value: "3.11"
-      # secrets — set these in the Render dashboard, never in the repo:
+      # secrets — set these in the Render dashboard, never in the repo.
+      # No PROOF_TOKEN here: posting is per-user (each user enters their own on the portal).
       - key: GROQ_API_KEY
         sync: false
       - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: PROOF_TOKEN
         sync: false
