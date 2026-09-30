@@ -180,7 +180,7 @@
 <div class="sheet">
   <div class="eyebrow"><span class="dot"></span> Vruksha · Voice Log for Proof <span class="dot"></span></div>
   <h1>Speak your <span class="b">proof</span>.</h1>
-  <p class="lede">Tell it what you worked on today. It listens, asks one thing back, and writes your Proof log — in your own words.</p>
+  <p class="lede">Two minutes, out loud. It writes down what you said — your words, not a summary, not cleaned up.</p>
 
   <!-- start -->
   <div id="start">
@@ -189,8 +189,8 @@
       <span class="label">Speak in</span>
       <div class="row" id="langPicker"></div>
     </div>
-    <p class="lede" style="margin:18px auto 20px">About two minutes, hands-free. It asks, listens on its own, asks one follow-up, and reads it back. Nothing posts until you say yes.</p>
-    <button id="begin" class="primary wide" style="padding:14px">Start session</button>
+    <p class="lede" style="margin:18px auto 20px">Hands-free. It asks, waits while you think, asks one thing back, and reads it out. Nothing posts until you say so.</p>
+    <button id="begin" class="primary wide" style="padding:14px">Start talking</button>
     <p class="foot" id="mode"></p>
   </div>
 
@@ -209,31 +209,31 @@
     <p class="state" id="state">…</p>
     <p class="heard" id="heard"></p>
     <div class="row center" style="margin-top:14px">
-      <button id="done" class="primary hidden">Done speaking</button>
+      <button id="done" class="primary hidden">I'm done</button>
     </div>
     <div class="row center" style="margin-top:10px">
-      <button id="redo" class="ghost">↺ say again</button>
-      <button id="typeToggle" class="ghost">⌨ type instead</button>
+      <button id="redo" class="ghost">↺ again</button>
+      <button id="typeToggle" class="ghost">⌨ type it</button>
     </div>
     <div id="typeBox" class="hidden" style="margin-top:12px">
-      <textarea id="typed" placeholder="type your answer"></textarea>
-      <button id="sendTyped" class="pill">Send answer →</button>
+      <textarea id="typed" placeholder="type it instead"></textarea>
+      <button id="sendTyped" class="pill">Send →</button>
     </div>
   </div>
 
   <!-- confirm -->
   <div id="confirm" class="hidden">
     <div class="rule"></div>
-    <p class="label" style="text-align:center;margin-bottom:14px">Here is your log — your words, unedited</p>
+    <p class="label" style="text-align:center;margin-bottom:14px">Your words, unedited · nothing added</p>
     <div class="entry">
       <span class="verb" id="cVerb">log</span>
       <p class="what" id="cContent"></p>
       <p class="why" id="whyLine"><span class="kw">because</span> <span id="cWhy"></span></p>
     </div>
-    <p class="state" id="confirmState" style="margin-top:14px">say “yes” to post · “no” to cancel</p>
+    <p class="state" id="confirmState" style="margin-top:14px">it goes on your public record · say yes, or no to bin it</p>
     <div class="row center" style="margin-top:14px">
       <button id="yes" class="good">Yes, post it</button>
-      <button id="no" class="bad">No, cancel</button>
+      <button id="no" class="bad">No, bin it</button>
     </div>
   </div>
 
@@ -273,7 +273,7 @@ function orb(mode, label){
 function speak(text){
   return new Promise(async resolve => {
     if(!text) return resolve();
-    orb("speak","speaking");
+    orb("speak","saying it");
     try{
       const r = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
       if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); a.onended=resolve; a.onerror=resolve; return a.play().catch(resolve); }
@@ -313,7 +313,7 @@ function autoListen(onFinal){
     recognizer = new SR(); recognizer.lang = srLocale();
     recognizer.interimResults = true; recognizer.continuous = false; recognizer.maxAlternatives = 1;
     let finalText = "";
-    listening = true; orb("listen","listening — just talk");
+    listening = true; orb("listen","listening. just talk.");
     recognizer.onresult = e => {
       let interim=""; finalText="";
       for(const r of e.results){ (r.isFinal ? finalText+=r[0].transcript : interim+=r[0].transcript); }
@@ -322,14 +322,14 @@ function autoListen(onFinal){
     recognizer.onend = () => {
       listening=false;
       if(finalText.trim()){ orb("think","thinking"); onFinal(finalText.trim()); }
-      else { orb("listen","didn’t catch that — tap ↺ or just talk"); }  // silence: wait, let them retry
+      else { orb("listen","didn’t catch that. talk, or tap ↺."); }  // silence: wait, let them retry
     };
-    recognizer.onerror = () => { listening=false; orb("","tap ↺ to try again"); };
+    recognizer.onerror = () => { listening=false; orb("","tap ↺ to try again."); };
     recognizer.start();
     return;
   }
   // no SpeechRecognition: record audio, auto-stop on silence, send to server Whisper
-  recordWithSilence(blob => { orb("think","transcribing"); onFinal_audio = onFinal; sendAnswer("", blob); });
+  recordWithSilence(blob => { orb("think","writing it down"); onFinal_audio = onFinal; sendAnswer("", blob); });
 }
 let onFinal_audio = null;
 
@@ -345,7 +345,7 @@ async function recordWithSilence(finish){
   const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(stream);
   const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an); const buf=new Uint8Array(an.fftSize);
   let started=false, startAt=0, lastVoiceAt=performance.now(), ended=false;
-  listening=true; orb("listen","listening — take your time"); show("#done",true);
+  listening=true; orb("listen","listening. take your time."); show("#done",true);
   rec.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
   // Build the blob in onstop: ondataavailable fires ASYNC after stop(), so the chunk
   // isn't in `chunks` yet on the line right after rec.stop(). This is why it was 0 bytes.
@@ -363,9 +363,9 @@ async function recordWithSilence(finish){
     if(started){
       const spokeEnough = (lastVoiceAt-startAt) > MIN_SPEECH_MS;
       if(spokeEnough && quietFor > SILENCE_MS){ return stop(); }   // natural end of turn
-      if(quietFor > 800 && quietFor <= SILENCE_MS) orb("listen","(pause — still listening)");
+      if(quietFor > 800 && quietFor <= SILENCE_MS) orb("listen","(paused. still here.)");
     } else if(now-lastVoiceAt > GRACE_MS){
-      orb("listen","take your time — tap Done when ready");        // never auto-stop before they speak
+      orb("listen","no rush. tap I’m done when ready.");        // never auto-stop before they speak
     }
     requestAnimationFrame(tick);
   }; requestAnimationFrame(tick);
@@ -381,7 +381,7 @@ async function sendAnswer(text, blob){
   if(text) fd.append("transcript", text);
   if(blob) fd.append("audio", blob, "a.webm");
   const r = await fetch(`/api/session/${sid}/answer`, {method:"POST", body:fd});
-  if(!r.ok){ orb("","error — tap ↺"); $("#heard").textContent=(await r.json()).detail||"error"; return; }
+  if(!r.ok){ orb("","that broke. tap ↺."); $("#heard").textContent=(await r.json()).detail||"error"; return; }
   const d = await r.json();
   if(d.transcript) setHeard("“" + d.transcript + "”");
   orb("think","got it");
@@ -402,17 +402,17 @@ $("#no").onclick  = () => sendConfirm("no");
 async function sendConfirm(utterance){
   if(recognizer){ try{recognizer.abort()}catch(e){} }
   const d = await (await fetch(`/api/session/${sid}/confirm`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({utterance})})).json();
-  if(d.needs==="confirm"){ $("#confirmState").textContent="please say yes or no"; autoListen(t=>sendConfirm(t)); return; }
+  if(d.needs==="confirm"){ $("#confirmState").textContent="yes, or no."; autoListen(t=>sendConfirm(t)); return; }
   show("#confirm",false); show("#finish",true);
   const posted = d.stage==="posted";
-  $("#doneMsg").textContent = posted ? "✓ In the record." : "Okay — not posted.";
+  $("#doneMsg").textContent = posted ? "In the record." : "Not posted. Nothing lost.";
   $("#result").textContent = JSON.stringify(d.post_result||{message:"cancelled"}, null, 2);
   speak(posted ? (lang==="ta"?"பதிவு செய்யப்பட்டது":"Posted to your record.") : (lang==="ta"?"பதிவு செய்யவில்லை":"Okay, not posted."));
 }
 $("#again").onclick = () => location.reload();
 
 fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt;
-  $("#mode").textContent = `${h.dry_run?"dry-run · nothing posts":"live"} · stt ${h.stt} · llm ${h.llm} · tts ${h.tts}`;
+  $("#mode").textContent = `${h.dry_run?"dry-run — nothing posts":"live — posts for real"} · ${h.stt} · ${h.llm} · ${h.tts}`;
 });
 </script>
 </body>
