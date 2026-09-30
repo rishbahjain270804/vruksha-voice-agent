@@ -124,7 +124,7 @@ $("#proofOff") && ($("#proofOff").onclick = () => {
   };
 });
 function acctClose(){ show("#acctPanel", false); $("#acctPanel").innerHTML=""; }
-function setConnected(u){ USER=u; CID=u; try{localStorage.setItem("vruksha_user",u);}catch(e){} setMemLabel(); acctClose(); loadLogs(); }
+function setConnected(u){ u=(u||"").toLowerCase(); USER=u; CID=u; try{localStorage.setItem("vruksha_user",u);}catch(e){} setMemLabel(); acctClose(); loadLogs(); }
 async function postJSON(url, body){ return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
 setMemLabel();
 
@@ -138,7 +138,7 @@ $("#acctSetup").onclick = () => {
     <button id="suCreate" class="primary wide">Create code</button>
     <p class="acctmsg" id="suMsg"></p></div>`;
   $("#suCreate").onclick = async () => {
-    const u=$("#suUser").value.trim(), m=$("#suMsg"); m.className="acctmsg"; m.textContent="creating…";
+    const u=$("#suUser").value.trim().toLowerCase(), m=$("#suMsg"); m.className="acctmsg"; m.textContent="creating…";
     try{
       const r=await postJSON("/api/auth/setup",{username:u});
       if(!r.ok){ m.className="acctmsg err"; m.textContent=(await r.json()).detail||"failed"; return; }
@@ -170,7 +170,7 @@ $("#acctConnect").onclick = () => {
     <button id="cnGo" class="primary wide">Connect</button>
     <p class="acctmsg" id="cnMsg"></p></div>`;
   $("#cnGo").onclick = async () => {
-    const u=$("#cnUser").value.trim(), code=$("#cnCode").value.trim(), m=$("#cnMsg"); m.className="acctmsg"; m.textContent="connecting…";
+    const u=$("#cnUser").value.trim().toLowerCase(), code=$("#cnCode").value.trim(), m=$("#cnMsg"); m.className="acctmsg"; m.textContent="connecting…";
     const r=await postJSON("/api/auth/verify",{username:u,code});
     if(r.ok){ m.className="acctmsg ok"; m.textContent="connected as @"+u; setTimeout(()=>setConnected(u),700); }
     else { m.className="acctmsg err"; m.textContent="invalid username or code"; }

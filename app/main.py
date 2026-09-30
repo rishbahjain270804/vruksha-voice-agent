@@ -82,7 +82,7 @@ def app_css():
 @app.get("/api/logs")
 def api_logs(client: str = ""):
     from .agent import history
-    return history.list_logs((client or "")[:64])
+    return history.list_logs((client or "").strip().lower()[:64])
 
 
 @app.post("/api/auth/setup")
@@ -129,7 +129,7 @@ def languages():
 def start(lang: str = "en", client: str = ""):
     lang = lang if lang in LANGUAGES else "en"
     sid = uuid.uuid4().hex[:12]
-    SESSIONS[sid] = ConversationState(session_id=sid, client=(client or "")[:64], lang=lang, stage="greet")
+    SESSIONS[sid] = ConversationState(session_id=sid, client=(client or "").strip().lower()[:64], lang=lang, stage="greet")
     return _view(SESSIONS[sid])
 
 

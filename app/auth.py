@@ -40,15 +40,21 @@ def _ensure(conn) -> None:
         cur.execute("CREATE TABLE IF NOT EXISTS vruksha_users ("
                     "username text PRIMARY KEY, secret text, created timestamptz DEFAULT now())")
         cur.execute("ALTER TABLE vruksha_users ADD COLUMN IF NOT EXISTS proof_token text")
+        # usernames are case-insensitive; fold any legacy mixed-case rows to lowercase
+        cur.execute("UPDATE vruksha_users SET username=lower(username) WHERE username <> lower(username)")
     conn.commit()
     _READY = True
+
+
+def _norm(u: str) -> str:
+    return (u or "").strip().lower()
 
 
 _PFILE = Path(__file__).resolve().parent.parent / "proof_tokens.json"
 
 
 def get_proof_token(username: str) -> str | None:
-    u = (username or "").strip()
+    u = _norm(username)
     if not u:
         return None
     if _DB:
@@ -69,7 +75,7 @@ def get_proof_token(username: str) -> str | None:
 
 def set_proof_token(username: str, token: str) -> bool:
     """Store this user's own Proof token so their logs post to their record. Requires the user to exist."""
-    u = (username or "").strip()
+    u = _norm(username)
     tok = (token or "").strip()
     if not u or not taken(u):
         return False
@@ -99,6 +105,7 @@ def set_proof_token(username: str, token: str) -> bool:
 
 
 def _get_secret(username: str) -> str | None:
+    username = _norm(username)
     if _DB:
         try:
             with _connect() as conn:
@@ -117,6 +124,7 @@ def _get_secret(username: str) -> str | None:
 
 def _put_secret(username: str, secret: str) -> bool:
     """Persist a new user; returns False if the name is already taken."""
+    username = _norm(username)
     if _DB:
         try:
             with _connect() as conn:
@@ -150,7 +158,7 @@ def taken(username: str) -> bool:
 def setup(username: str) -> tuple[bool, str]:
     """Begin enrolment. Returns (ok, otpauth_uri) or (False, error message)."""
     import pyotp
-    u = (username or "").strip()
+    u = _norm(username)
     if not USERNAME_RE.match(u):
         return False, "username must be 3–32 chars (letters, numbers, . _ -)"
     if taken(u):
@@ -164,7 +172,7 @@ def setup(username: str) -> tuple[bool, str]:
 def verify(username: str, code: str) -> bool:
     """True if the code is valid. Persists a pending enrolment on first success."""
     import pyotp
-    u = (username or "").strip()
+    u = _norm(username)
     c = re.sub(r"\D", "", code or "")
     if not u or len(c) < 6:
         return False

@@ -41,6 +41,7 @@ def _ensure(conn) -> None:
             id bigserial PRIMARY KEY, topic text, keywords jsonb,
             verb text, snippet text, log_id text, client text, ts timestamptz DEFAULT now())""")
         cur.execute("ALTER TABLE vruksha_logs ADD COLUMN IF NOT EXISTS client text")  # for older tables
+        cur.execute("UPDATE vruksha_logs SET client=lower(client) WHERE client <> lower(client)")  # case-fold
     conn.commit()
     _TABLE_READY = True
 
