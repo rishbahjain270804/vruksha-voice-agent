@@ -9,22 +9,28 @@ from __future__ import annotations
 import os, json
 import httpx
 
-VALID_VERBS = {"built", "stuck", "mistake", "thinking", "decided"}  # confirm the rest via tools_list()
+# The full enum the server accepts (from tools/list).
+VALID_VERBS = {"built", "stuck", "mistake", "thinking", "decided", "nothing", "quiet", "changed",
+               "flagged", "thank", "learned", "freely", "assumed", "noticed", "ask", "wonder",
+               "figure_out", "interview"}
 
 
-def _payload(verb: str, content: str, why: str) -> dict:
+def _payload(verb: str, content: str, why: str, evidence_url: str = "") -> dict:
     if verb not in VALID_VERBS:
         verb = "built"
+    args = {"verb": verb, "content": content, "why": why}
+    if evidence_url:
+        args["evidence_url"] = evidence_url
     return {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": "post_log", "arguments": {"verb": verb, "content": content, "why": why}}}
+            "params": {"name": "post_log", "arguments": args}}
 
 
-def post_log(verb: str, content: str, why: str) -> dict:
+def post_log(verb: str, content: str, why: str, evidence_url: str = "") -> dict:
     """Post one log, or, in dry-run, return the payload that WOULD be sent."""
     base = os.getenv("PROOF_BASE", "https://proof.zeromaintenanceengineer.in")
     token = os.getenv("PROOF_TOKEN", "").strip()
     dry = os.getenv("PROOF_DRY_RUN", "1") != "0"
-    body = _payload(verb, content, why)
+    body = _payload(verb, content, why, evidence_url)
 
     if dry or not token:
         return {"dry_run": True, "reason": "PROOF_DRY_RUN" if dry else "no PROOF_TOKEN",

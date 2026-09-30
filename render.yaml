@@ -1,0 +1,39 @@
+# One-click deploy on Render (free). New + → Blueprint → connect this repo → fill the 3 secrets.
+# Always-on HTTPS URL the Vruksha team can test without installing anything.
+services:
+  - type: web
+    name: vruksha-voice-agent
+    runtime: python
+    plan: free
+    # Lean runtime deps only: STT=groq and TTS=elevenlabs need no local models,
+    # so we skip faster-whisper / edge-tts here to keep the build small and fast.
+    buildCommand: pip install fastapi "uvicorn[standard]" pydantic python-dotenv httpx groq
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PROOF_DRY_RUN
+        value: "1"                 # keep dry-run on the public demo so no one can post to your record
+      - key: STT_PROVIDER
+        value: groq
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: TTS_PROVIDER
+        value: elevenlabs
+      - key: ELEVENLABS_VOICE_ID
+        value: EXAVITQu4vr4xnSDxMaL
+      - key: ELEVENLABS_MODEL
+        value: eleven_multilingual_v2
+      - key: DEFAULT_LANG
+        value: en
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # secrets — set these in the Render dashboard, never in the repo:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: PROOF_TOKEN
+        sync: false
