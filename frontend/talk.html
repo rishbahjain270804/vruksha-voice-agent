@@ -43,6 +43,9 @@
       <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
     </div>
     <p class="state" id="state">…</p>
+    <div class="row center" style="margin-top:8px">
+      <button id="skip" class="ghost hidden">↷ I'll answer now</button>
+    </div>
     <p class="heard" id="heard"></p>
     <div class="row center" style="margin-top:14px">
       <button id="done" class="primary hidden">I'm done</button>
@@ -103,7 +106,7 @@ function haltCurrent(){
   try{ if(rec && rec.state && rec.state!=="inactive") rec.stop(); }catch(e){}
   try{ if(curAudio){ curAudio.pause(); curAudio=null; } }catch(e){}
   try{ speechSynthesis.cancel(); }catch(e){}
-  show("#done", false);
+  show("#done", false); show("#skip", false);
 }
 function stopConvo(){
   haltCurrent(); paused=false; $("#pause").textContent="⏸ pause";
@@ -130,20 +133,29 @@ function orb(mode, label){
   $("#orb").dataset.state = state; $("#state").textContent = label;
 }
 
+let _speakResolve = null;   // lets "I'll answer now" (barge-in) cut speech short
+function answerNow(){        // tapped while the agent is speaking
+  try{ if(curAudio){ curAudio.pause(); curAudio=null; } speechSynthesis.cancel(); }catch(e){}
+  if(_speakResolve){ const r=_speakResolve; _speakResolve=null; r(); }
+}
 function speak(text){
-  return new Promise(async resolve => {
-    if(!text) return resolve();
+  return new Promise(resolve => {
+    const fin = () => { _speakResolve=null; resolve(); };
+    _speakResolve = fin;
+    if(!text) return fin();
     orb("speak","saying it");
-    try{
-      const r = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
-      if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); curAudio=a;
-        const done=()=>{ if(curAudio===a) curAudio=null; resolve(); };
-        a.onended=done; a.onerror=done; return a.play().catch(done); }
-    }catch(e){}
-    try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=srLocale();
-         u.onend=resolve; u.onerror=resolve; speechSynthesis.speak(u);
-         setTimeout(resolve, Math.min(12000, 1500+text.length*70));
-    }catch(e){ resolve(); }
+    (async () => {
+      try{
+        const r = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
+        if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); curAudio=a;
+          const done=()=>{ if(curAudio===a) curAudio=null; fin(); };
+          a.onended=done; a.onerror=done; return a.play().catch(done); }
+      }catch(e){}
+      try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=srLocale();
+           u.onend=fin; u.onerror=fin; speechSynthesis.speak(u);
+           setTimeout(fin, Math.min(12000, 1500+text.length*70));
+      }catch(e){ fin(); }
+    })();
   });
 }
 
@@ -163,7 +175,9 @@ async function runStage(d){
   if(d.stage==="confirm"){ return goConfirm(d); }
   setAgent(d.say || "…");
   $("#heard").textContent = "";
+  show("#skip", true);               // barge-in: interrupt while it's speaking
   await speak(d.say);
+  show("#skip", false);
   if(paused) return;                 // don't start listening if paused mid-question
   autoListen(text => sendAnswer(text, null));
 }
@@ -254,7 +268,8 @@ function goConfirm(d){
   $("#cContent").textContent=d.draft.content;
   const why=(d.draft.why||"").trim();
   $("#cWhy").textContent=why; show("#whyLine", !!why);
-  speak(d.say).then(()=>autoListen(t=>sendConfirm(t)));
+  show("#skip", true);
+  speak(d.say).then(()=>{ show("#skip", false); autoListen(t=>sendConfirm(t)); });
 }
 $("#yes").onclick = () => sendConfirm("yes, post it");
 $("#no").onclick  = () => sendConfirm("no");
@@ -279,6 +294,7 @@ async function sendConfirm(utterance){
 $("#again").onclick = () => location.reload();
 $("#pause").onclick = togglePause;
 $("#stop").onclick = stopConvo;
+$("#skip").onclick = answerNow;
 
 fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt; }).catch(()=>{});
 </script>
