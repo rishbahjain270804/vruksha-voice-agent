@@ -178,7 +178,6 @@
     </div>
     <p class="lede" style="margin:18px auto 20px">Hands-free. It asks, waits while you think, asks one thing back, and reads it out. Nothing posts until you say so.</p>
     <button id="begin" class="primary wide" style="padding:14px">Start talking</button>
-    <p class="foot" id="mode"></p>
   </div>
 
   <!-- conversation -->
@@ -398,9 +397,7 @@ async function sendConfirm(utterance){
 }
 $("#again").onclick = () => location.reload();
 
-fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt;
-  $("#mode").textContent = `${h.dry_run?"dry-run — nothing posts":"live — posts for real"} · ${h.stt} · ${h.llm} · ${h.tts}`;
-});
+fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt; }).catch(()=>{});
 </script>
 </body>
 </html>
