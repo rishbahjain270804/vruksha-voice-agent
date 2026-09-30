@@ -23,16 +23,16 @@
 
   <div class="rule"></div>
   <div class="row between">
-    <span class="label">Signed in as</span>
+    <span class="label" id="memLabel">Memory</span>
     <span id="memWho" class="memwho">this browser</span>
   </div>
   <div class="row center" style="margin-top:10px;gap:14px">
     <button id="acctSetup" class="ghost">set up a code</button>
     <button id="acctConnect" class="ghost">connect on this device</button>
-    <button id="acctForget" class="ghost hidden">sign out here</button>
+    <button id="acctForget" class="ghost danger hidden">log out</button>
   </div>
   <div id="acctPanel" class="hidden"></div>
-  <p class="hint">an authenticator code (Google Authenticator / Authy) is the whole login — nothing else to remember</p>
+  <p class="hint" id="acctHint">an authenticator code (Google Authenticator / Authy) is the whole login — nothing else to remember</p>
 
   <div class="rule"></div>
   <p class="label" style="margin-bottom:6px">Your recent logs</p>
@@ -50,7 +50,18 @@ let CID="", USER="";
 try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID=genCode(); localStorage.setItem("vruksha_cid",CID);} }catch(e){ CID=genCode(); }
 try{ USER = localStorage.getItem("vruksha_user") || ""; if(USER) CID=USER; }catch(e){}
 
-function setMemLabel(){ $("#memWho").textContent = USER ? "@"+USER : "this browser"; show("#acctForget", !!USER); }
+function setMemLabel(){
+  const on = !!USER;
+  $("#memWho").textContent = on ? "@"+USER : "this browser";
+  $("#memLabel").textContent = on ? "Signed in as" : "Memory";
+  show("#acctForget", on);            // logged in → only logout
+  show("#acctSetup", !on);            // logged out → setup / connect
+  show("#acctConnect", !on);
+  $("#acctHint").textContent = on
+    ? "your history follows this username on any device you connect"
+    : "an authenticator code (Google Authenticator / Authy) is the whole login — nothing else to remember";
+  if(on) acctClose();
+}
 function acctClose(){ show("#acctPanel", false); $("#acctPanel").innerHTML=""; }
 function setConnected(u){ USER=u; CID=u; try{localStorage.setItem("vruksha_user",u);}catch(e){} setMemLabel(); acctClose(); loadLogs(); }
 async function postJSON(url, body){ return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
