@@ -15,18 +15,74 @@ from .followup import _keyword, _STOP
 from ..models.schemas import lang_cfg
 
 DONE = "__DONE__"
-MAX_QUESTIONS = 4          # including the opening question, to keep it ~2 minutes
+MAX_QUESTIONS = 5          # opener + up to 4 follow-ups; it usually stops earlier
 
+# The interview targets exactly what Proof's curators reward (measured against the public corpus):
+# a reason next to the decision, the alternative it was chosen OVER, one honest/skipped/risked thing,
+# and a concrete artefact (file/error/number). Those markers are what separate a picked log from an
+# ignored one — so we elicit them in the SPEAKER'S words; nothing is fabricated.
 SYSTEM = (
-    "You are a sharp, warm engineer talking to a peer about ONE day of their work, for a public "
-    "engineering log. Read everything they have said so far and ask the SINGLE best next question "
-    "that digs into what THEY actually said — quote their own words, follow their thread, do not "
-    "read from a script. Before you are allowed to finish you must have learned three things: "
-    "(1) what they worked on, (2) what was hard or what broke, (3) WHY they did it that way. "
-    "One question only, under 18 words, no preamble, no numbering. You have already asked {n} "
-    "question(s); you may ask at most {maxq}. If you already know the WHY and have enough for a "
-    "real log, reply with exactly DONE. Reply in {lang}. Output only the question, or DONE."
+    "You are a sharp, warm engineer interviewing a peer about ONE day of their work, for a public "
+    "engineering log that founders read to judge how someone thinks. Read everything said so far and "
+    "ask the SINGLE best next question, following their thread and quoting their own words — never a "
+    "script. Across this short interview you are trying to surface what a strong log needs: "
+    "(1) what they did, (2) the reason behind it (the 'because'), (3) what they chose it OVER (the "
+    "alternative they rejected), and (4) one honest thing — what they skipped, what it cost, a risk, "
+    "or a mistake. If an answer is vague, ask instead for ONE concrete detail: a file, an error, a "
+    "number. One question, under 18 words, no preamble, no numbering. You have asked {n} of at most "
+    "{maxq}. Reply with exactly DONE once you have the reason AND either the alternative or the honest/"
+    "skipped part — do not pad. Reply in {lang}. Output only the question, or DONE."
 )
+
+# Proof's verb enum (from tools/list). The model labels the log; it never edits the transcript.
+VERBS = ["built", "decided", "stuck", "mistake", "figure_out", "learned", "changed", "noticed",
+         "thinking", "flagged", "thank", "assumed", "wonder", "ask", "freely", "nothing", "quiet"]
+
+
+def choose_verb(answers: List[Dict], lang: str = "en") -> str:
+    """Pick the Proof verb that best fits the log. LLM when available, else a transparent rule."""
+    provider = os.getenv("LLM_PROVIDER", "rule").lower()
+    text = " ".join(a.get("transcript", "") for a in answers)
+    if provider in ("groq", "gemini"):
+        try:
+            v = _verb_llm(answers, provider)
+            if v in VERBS:
+                return v
+        except Exception as e:
+            print(f"[planner] verb {provider} failed ({e}); using rule")
+    return _verb_rule(text)
+
+
+def _verb_rule(text: str) -> str:
+    t = text.lower()
+    if re.search(r"\b(chose|choose|decided|instead of|over the|picked|went with|rather than)\b", t):
+        return "decided"
+    if re.search(r"\b(mistake|wrong|my bad|shouldn'?t have|messed up|broke it)\b", t):
+        return "mistake"
+    if re.search(r"\b(figured out|figured it|worked it out|cracked|got it working|fixed)\b", t):
+        return "figure_out"
+    if re.search(r"\b(stuck|blocked|can'?t get|couldn'?t|failing|error|crash|broke|not working)\b", t):
+        return "stuck"
+    if re.search(r"\b(learned|realis|realiz|understood|turns out|til\b)\b", t):
+        return "learned"
+    return "built"
+
+
+def _verb_llm(answers: List[Dict], provider: str) -> str:
+    convo = "\n".join(f"{a.get('question','')} -> {a.get('transcript','')}" for a in answers)
+    prompt = ("Pick the ONE verb from this list that best fits the engineering log below: "
+              + ", ".join(VERBS) + ". Reply with only the verb, lowercase, nothing else.\n\n" + convo)
+    if provider == "groq":
+        from groq import Groq
+        c = Groq(api_key=os.environ["GROQ_API_KEY"])
+        r = c.chat.completions.create(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0, max_tokens=120, reasoning_effort="low")
+        return r.choices[0].message.content.strip().lower().strip(".")
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    m = genai.GenerativeModel("gemini-1.5-flash")
+    return m.generate_content(prompt).text.strip().lower().strip(".")
 
 
 def plan_next(answers: List[Dict], lang: str = "en", maxq: int = MAX_QUESTIONS) -> str:
@@ -87,15 +143,19 @@ def _rule(answers: List[Dict], lang: str, maxq: int) -> str:
         return (f"{term} பற்றி கடினமான பகுதி என்ன, அல்லது எது வேலை செய்யவில்லை?" if ta
                 else f"What was the hard part of {term}, or what broke?")
     # 2) learn the why
-    if not _asked(answers, "why"):
+    if not _asked(answers, "why", "reason"):
         return ("அதை ஏன் அப்படிச் செய்தீர்கள்?" if ta else "Why did you do it that way?")
-    # 3) one dig-in on a decision they mentioned, then finish
-    if len(answers) < maxq:
+    # 3) the alternative — what did you pick it over? (Proof rewards naming this)
+    if not _asked(answers, "over", "instead", "alternative", "விட"):
         m = re.search(r"\b(switch(?:ed)?|chose|choose|pick(?:ed)?|used|moved to|went with)\s+(?:to\s+|a\s+|an\s+|the\s+)?([a-z][a-z0-9 \-]{2,30})",
                       " ".join(a["transcript"] for a in answers).lower())
         if m:
             thing = re.split(r"\s+(?:because|since|and|so|to|for|which|that|when|but)\b",
                              m.group(2).strip())[0].strip()
-            return (f"{thing} — வேறு விருப்பத்தை விட ஏன் அது?" if ta else f"You went with {thing} — why that over the other option?")
-        return (f"{term} பற்றி இன்னும் ஒரு விஷயம் சொல்ல முடியுமா?" if ta else f"What's one more thing that mattered about {term}?")
+            return (f"{thing} — வேறு எதை விட அதைத் தேர்ந்தெடுத்தீர்கள்?" if ta else f"You went with {thing} — what did you pick it over?")
+        return ("வேறு எந்த வழியை நீங்கள் தேர்ந்தெடுக்கவில்லை?" if ta else "What approach did you choose this over?")
+    # 4) the honest/skipped line — what did it cost, or what did you leave out?
+    if len(answers) < maxq:
+        return ("நீங்கள் எதை விட்டுவிட்டீர்கள், அல்லது அது என்ன விலை கொடுத்தது?" if ta
+                else "What did you skip or leave for later, or what did it cost?")
     return DONE

@@ -5,7 +5,7 @@ answer's transcript. That is how the 'LLM must not touch the transcript' rule is
 enforced structurally, not by convention."""
 from __future__ import annotations
 import re
-from .planner import plan_next, DONE
+from .planner import plan_next, choose_verb, DONE
 from . import history
 from ..models.schemas import ConversationState, Answer, lang_cfg
 
@@ -147,5 +147,6 @@ def _build_draft(st: ConversationState) -> None:
         content = tag + content
     st.draft_content = content
     st.draft_why = why
-    # verb inferred from everything they said (their words scanned for broke/chose/etc.)
-    st.draft_verb = _infer_verb(content, content)
+    # verb chosen by the model from Proof's enum (labels the log; never edits the transcript),
+    # with a transparent rule fallback.
+    st.draft_verb = choose_verb([a.model_dump() for a in st.answers], st.lang)

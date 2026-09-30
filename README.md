@@ -44,6 +44,16 @@ can return only a question string — it has no path to mutate a stored answer.
 - **Tamil.** Questions, Whisper transcription, and yes/no confirmation all work in Tamil.
 - **Confirm before post.** It reads the assembled log back verbatim; nothing posts until an explicit "yes".
 
+## Designed for what Proof actually rewards
+
+I read the public Proof corpus (the curated feed + the curator's "why I picked this" notes) and
+built the interview around what separates a picked log from an ignored one: **a reason next to the
+decision, the alternative it was chosen _over_, one honest thing (what was skipped / risked / got
+wrong), and a concrete artefact (a file, an error, a number).** 19% of picked logs name an
+alternative, 34% fill that honest "shadow line", 53% name a concrete artefact — so the planner steers
+the conversation to surface those, **in the speaker's own words** (never fabricated). The verb is
+chosen from Proof's real enum by the model, with a transparent rule fallback.
+
 ## How answers become a Proof log
 
 Proof's `post_log` takes `{verb, content, why}`. Because questions are planned (not fixed), the mapping is
