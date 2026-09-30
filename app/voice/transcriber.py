@@ -13,6 +13,11 @@ import os, re, tempfile
 _FILLERS = re.compile(r"\b(uh+|um+|hmm+|erm*|ah+|uhh+|mm+|er)\b[\s,.]*", re.I)
 
 
+def _whisper_lang(lang: str) -> str:
+    from ..models.schemas import lang_cfg
+    return lang_cfg(lang)["whisper"]
+
+
 def _clean(text: str) -> str:
     """Always safe: trim + collapse whitespace. Never changes words. Optional filler removal on top."""
     if not text:
@@ -52,7 +57,7 @@ def _groq(audio_bytes: bytes, lang: str) -> str:
             r = c.audio.transcriptions.create(
                 file=(os.path.basename(path), fh.read()),
                 model="whisper-large-v3",
-                language=("ta" if lang == "ta" else "en"),
+                language=_whisper_lang(lang),
                 # a light vocabulary hint so proper nouns survive (e.g. 'Vruksha', not 'ruksha').
                 # It biases spelling only; it never adds words the speaker didn't say.
                 prompt=os.getenv("STT_PROMPT",
@@ -84,7 +89,7 @@ def _faster_whisper(audio_bytes: bytes, lang: str) -> str:
         f.write(audio_bytes); path = f.name
     try:
         # condition_on_previous_text=False + a small no-speech guard trims hallucinated filler on short clips
-        segments, _ = _FW_MODEL.transcribe(path, language=("ta" if lang == "ta" else "en"),
+        segments, _ = _FW_MODEL.transcribe(path, language=_whisper_lang(lang),
                                             vad_filter=True, condition_on_previous_text=False)
         return " ".join(s.text for s in segments).strip()
     finally:

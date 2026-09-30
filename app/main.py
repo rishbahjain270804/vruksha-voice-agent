@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pathlib import Path
 
 load_dotenv()
-from .models.schemas import ConversationState
+from .models.schemas import ConversationState, LANGUAGES
 from .agent import conversation as conv
 from .agent import history
 from .voice.transcriber import transcribe
@@ -53,9 +53,14 @@ def index():
     return FRONTEND.read_text(encoding="utf-8") if FRONTEND.exists() else "<h1>frontend/index.html missing</h1>"
 
 
+@app.get("/api/languages")
+def languages():
+    return [{"code": k, "native": v["native"], "sr": v["sr"]} for k, v in LANGUAGES.items()]
+
+
 @app.post("/api/session/start")
 def start(lang: str = "en"):
-    lang = "ta" if lang == "ta" else "en"
+    lang = lang if lang in LANGUAGES else "en"
     sid = uuid.uuid4().hex[:12]
     SESSIONS[sid] = ConversationState(session_id=sid, lang=lang, stage="greet")
     return _view(SESSIONS[sid])
@@ -68,20 +73,16 @@ async def answer(sid: str, transcript: str = Form(default=""), audio: UploadFile
         raise HTTPException(409, f"not accepting answers at stage '{st.stage}'")
     text = (transcript or "").strip()
     if audio is not None:
-        raw = await audio.read()
-        server_text = transcribe(raw, st.lang)
-        print(f"[answer] audio={len(raw)}B transcript_in={text!r} whisper_out={server_text!r}", flush=True)
+        server_text = transcribe(await audio.read(), st.lang)
         if server_text:            # server STT wins when a provider is on
             text = server_text
-    else:
-        print(f"[answer] NO audio field; transcript_in={text!r}", flush=True)
     if not text:
         raise HTTPException(400, "no transcript (browser STT empty and no server provider)")
     if st.stage == "pick":         # "which earlier project is this?"
         conv.resolve_pick(st, text)
         return {**_view(st), "transcript": text}
     if st.stage == "link":         # the continuation yes/no
-        d = conv.classify_confirm(text)
+        d = conv.classify_confirm(text, st.lang)
         if d == "unclear":
             return {**_view(st), "transcript": text, "needs": "link"}
         conv.resolve_link(st, d == "yes")
@@ -95,7 +96,7 @@ def confirm(sid: str, body: dict):
     st = _get(sid)
     if st.stage != "confirm":
         raise HTTPException(409, "nothing awaiting confirmation")
-    decision = conv.classify_confirm(body.get("utterance", ""))
+    decision = conv.classify_confirm(body.get("utterance", ""), st.lang)
     if decision == "no":
         st.stage = "cancelled"
         return {**_view(st), "message": "Not posted. You can start again."}

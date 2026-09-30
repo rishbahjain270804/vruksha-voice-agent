@@ -12,6 +12,7 @@ from __future__ import annotations
 import os, re
 from typing import List, Dict
 from .followup import _keyword, _STOP
+from ..models.schemas import lang_cfg
 
 DONE = "__DONE__"
 MAX_QUESTIONS = 4          # including the opening question, to keep it ~2 minutes
@@ -54,7 +55,7 @@ def _groq(convo: str, lang: str, n: int, maxq: int) -> str:
     c = Groq(api_key=os.environ["GROQ_API_KEY"])
     r = c.chat.completions.create(
         model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
-        messages=[{"role": "system", "content": SYSTEM.format(n=n, maxq=maxq, lang="Tamil" if lang == "ta" else "English")},
+        messages=[{"role": "system", "content": SYSTEM.format(n=n, maxq=maxq, lang=lang_cfg(lang)["llm"])},
                   {"role": "user", "content": convo}],
         # gpt-oss reasons before answering; without headroom + low effort the answer comes back empty
         temperature=0.5, max_tokens=300, reasoning_effort="low")
@@ -65,7 +66,7 @@ def _gemini(convo: str, lang: str, n: int, maxq: int) -> str:
     import google.generativeai as genai
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     m = genai.GenerativeModel("gemini-1.5-flash")
-    r = m.generate_content(SYSTEM.format(n=n, maxq=maxq, lang="Tamil" if lang == "ta" else "English") + "\n\n" + convo)
+    r = m.generate_content(SYSTEM.format(n=n, maxq=maxq, lang=lang_cfg(lang)["llm"]) + "\n\n" + convo)
     return r.text.strip()
 
 
