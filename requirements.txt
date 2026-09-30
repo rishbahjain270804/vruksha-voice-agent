@@ -7,6 +7,7 @@ httpx>=0.27
 
 # Optional providers — install as you switch them on (app degrades gracefully if absent)
 edge-tts>=6.1          # free TTS, no key (TTS_PROVIDER=edge)
-# groq>=0.11           # Groq Whisper + LLM (STT_PROVIDER=groq / LLM_PROVIDER=groq)
-# google-generativeai  # Gemini follow-up (LLM_PROVIDER=gemini)
-# faster-whisper>=1.0  # local STT (STT_PROVIDER=faster_whisper)
+groq>=0.11             # Groq Whisper + adaptive planner (STT_PROVIDER=groq / LLM_PROVIDER=groq)
+faster-whisper>=1.0    # local STT + fallback when Groq STT fails (STT_PROVIDER=faster_whisper)
+# ElevenLabs TTS (TTS_PROVIDER=elevenlabs) uses httpx above — no extra package needed
+# google-generativeai  # Gemini planner (LLM_PROVIDER=gemini)
