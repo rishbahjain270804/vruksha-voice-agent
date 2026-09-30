@@ -25,21 +25,30 @@ def _payload(verb: str, content: str, why: str, evidence_url: str = "") -> dict:
             "params": {"name": "post_log", "arguments": args}}
 
 
-def post_log(verb: str, content: str, why: str, evidence_url: str = "") -> dict:
-    """Post one log, or, in dry-run, return the payload that WOULD be sent."""
+def post_log(verb: str, content: str, why: str, evidence_url: str = "", token: str | None = None) -> dict:
+    """Post one log, or, in dry-run, return the payload that WOULD be sent.
+    If `token` is given (a signed-in user's own Proof token), post to THEIR record for real,
+    regardless of the global dry-run switch; otherwise fall back to env token + dry-run rules."""
     base = os.getenv("PROOF_BASE", "https://proof.zeromaintenanceengineer.in")
-    token = os.getenv("PROOF_TOKEN", "").strip()
-    dry = os.getenv("PROOF_DRY_RUN", "1") != "0"
     body = _payload(verb, content, why, evidence_url)
+    if token:
+        token, dry = token.strip(), False
+    else:
+        token = os.getenv("PROOF_TOKEN", "").strip()
+        dry = os.getenv("PROOF_DRY_RUN", "1") != "0"
 
     if dry or not token:
         return {"dry_run": True, "reason": "PROOF_DRY_RUN" if dry else "no PROOF_TOKEN",
                 "would_send": body, "endpoint": f"{base}/api/mcp"}
 
-    r = httpx.post(f"{base}/api/mcp", json=body, timeout=30,
-                   headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-    r.raise_for_status()
-    return {"dry_run": False, "status": r.status_code, "response": _safe_json(r)}
+    try:
+        r = httpx.post(f"{base}/api/mcp", json=body, timeout=30,
+                       headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        r.raise_for_status()
+        return {"dry_run": False, "status": r.status_code, "response": _safe_json(r)}
+    except Exception as e:
+        # a wrong/expired token or a network blip shouldn't 500 the confirm — report it instead
+        return {"dry_run": False, "ok": False, "error": str(e)[:160]}
 
 
 def tools_list() -> dict:

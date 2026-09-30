@@ -34,6 +34,20 @@
   <div id="acctPanel" class="hidden"></div>
   <p class="hint" id="acctHint">an authenticator code (Google Authenticator / Authy) is the whole login — nothing else to remember</p>
 
+  <div id="proofSect" class="hidden">
+    <div class="rule"></div>
+    <div class="row between">
+      <span class="label">Post to Proof</span>
+      <span id="proofState" class="memwho">not connected</span>
+    </div>
+    <p class="hint" style="text-align:left;margin-top:8px">Connect your own Proof token so your logs post to <b>your</b> record. Create one at proof.zeromaintenanceengineer.in/settings/mcp.</p>
+    <div class="row center" style="margin-top:8px;gap:14px">
+      <button id="proofSetup" class="ghost">connect proof</button>
+      <button id="proofOff" class="ghost danger hidden">disconnect</button>
+    </div>
+    <div id="proofPanel" class="hidden"></div>
+  </div>
+
   <div class="rule"></div>
   <p class="label" style="margin-bottom:6px">Your recent logs</p>
   <div id="logs"><p class="hint" style="text-align:left;margin-top:6px">loading…</p></div>
@@ -60,8 +74,50 @@ function setMemLabel(){
   $("#acctHint").textContent = on
     ? "your history follows this username on any device you connect"
     : "an authenticator code (Google Authenticator / Authy) is the whole login — nothing else to remember";
-  if(on) acctClose();
+  show("#proofSect", on);
+  if(on){ acctClose(); proofStatus(); }
 }
+
+async function proofStatus(){
+  if(!USER) return;
+  try{
+    const {connected}=await (await fetch(`/api/auth/proof_status?username=${encodeURIComponent(USER)}`)).json();
+    $("#proofState").textContent = connected ? "connected — posts to your record" : "not connected (dry-run)";
+    show("#proofOff", connected); show("#proofSetup", !connected);
+  }catch(e){}
+}
+function proofClose(){ show("#proofPanel",false); $("#proofPanel").innerHTML=""; }
+
+$("#proofSetup") && ($("#proofSetup").onclick = () => {
+  const p=$("#proofPanel"); show("#proofPanel",true);
+  p.innerHTML = `<div class="acctbox">
+    <p class="step">Paste your Proof token and your current 6-digit code to authorize it.</p>
+    <input id="pfTok" placeholder="proof_mcp_… token" autocomplete="off">
+    <input id="pfCode" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code">
+    <button id="pfGo" class="primary wide">Connect Proof</button>
+    <p class="acctmsg" id="pfMsg"></p></div>`;
+  $("#pfGo").onclick = async () => {
+    const token=$("#pfTok").value.trim(), code=$("#pfCode").value.trim(), m=$("#pfMsg"); m.className="acctmsg"; m.textContent="connecting…";
+    const r=await postJSON("/api/auth/proof",{username:USER,code,token});
+    if(r.ok){ m.className="acctmsg ok"; m.textContent="connected — your logs now post to your Proof record"; setTimeout(()=>{proofClose();proofStatus();},800); }
+    else { m.className="acctmsg err"; m.textContent=(await r.json()).detail||"failed — check the code"; }
+  };
+});
+
+$("#proofOff") && ($("#proofOff").onclick = () => {
+  const p=$("#proofPanel"); show("#proofPanel",true);
+  p.innerHTML = `<div class="acctbox">
+    <p class="step">Enter your current 6-digit code to disconnect Proof (logs go back to dry-run).</p>
+    <input id="pfCode2" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code">
+    <button id="pfOff2" class="bad wide">Disconnect</button>
+    <p class="acctmsg" id="pfMsg2"></p></div>`;
+  $("#pfOff2").onclick = async () => {
+    const code=$("#pfCode2").value.trim(), m=$("#pfMsg2"); m.className="acctmsg"; m.textContent="…";
+    const r=await postJSON("/api/auth/proof",{username:USER,code,token:""});
+    if(r.ok){ m.className="acctmsg ok"; m.textContent="disconnected"; setTimeout(()=>{proofClose();proofStatus();},700); }
+    else { m.className="acctmsg err"; m.textContent=(await r.json()).detail||"failed"; }
+  };
+});
 function acctClose(){ show("#acctPanel", false); $("#acctPanel").innerHTML=""; }
 function setConnected(u){ USER=u; CID=u; try{localStorage.setItem("vruksha_user",u);}catch(e){} setMemLabel(); acctClose(); loadLogs(); }
 async function postJSON(url, body){ return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }

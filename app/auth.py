@@ -39,8 +39,63 @@ def _ensure(conn) -> None:
     with conn.cursor() as cur:
         cur.execute("CREATE TABLE IF NOT EXISTS vruksha_users ("
                     "username text PRIMARY KEY, secret text, created timestamptz DEFAULT now())")
+        cur.execute("ALTER TABLE vruksha_users ADD COLUMN IF NOT EXISTS proof_token text")
     conn.commit()
     _READY = True
+
+
+_PFILE = Path(__file__).resolve().parent.parent / "proof_tokens.json"
+
+
+def get_proof_token(username: str) -> str | None:
+    u = (username or "").strip()
+    if not u:
+        return None
+    if _DB:
+        try:
+            with _connect() as conn:
+                _ensure(conn)
+                with conn.cursor() as cur:
+                    cur.execute("SELECT proof_token FROM vruksha_users WHERE username=%s", (u,))
+                    row = cur.fetchone()
+                    return (row[0] or None) if row else None
+        except Exception as e:
+            print(f"[auth] pg proof get failed ({e}); using file")
+    try:
+        return json.loads(_PFILE.read_text(encoding="utf-8")).get(u)
+    except Exception:
+        return None
+
+
+def set_proof_token(username: str, token: str) -> bool:
+    """Store this user's own Proof token so their logs post to their record. Requires the user to exist."""
+    u = (username or "").strip()
+    tok = (token or "").strip()
+    if not u or not taken(u):
+        return False
+    if _DB:
+        try:
+            with _connect() as conn:
+                _ensure(conn)
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE vruksha_users SET proof_token=%s WHERE username=%s", (tok or None, u))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"[auth] pg proof set failed ({e}); using file")
+    try:
+        d = json.loads(_PFILE.read_text(encoding="utf-8"))
+    except Exception:
+        d = {}
+    if tok:
+        d[u] = tok
+    else:
+        d.pop(u, None)
+    try:
+        _PFILE.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        print(f"[auth] file proof set failed ({e})")
+    return True
 
 
 def _get_secret(username: str) -> str | None:

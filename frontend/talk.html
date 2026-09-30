@@ -51,6 +51,10 @@
       <button id="redo" class="ghost">↺ again</button>
       <button id="typeToggle" class="ghost">⌨ type it</button>
     </div>
+    <div class="row center" style="margin-top:6px;gap:16px">
+      <button id="pause" class="ghost">⏸ pause</button>
+      <button id="stop" class="ghost danger">✕ stop</button>
+    </div>
     <div id="typeBox" class="hidden" style="margin-top:12px">
       <textarea id="typed" placeholder="type it instead"></textarea>
       <button id="sendTyped" class="pill">Send →</button>
@@ -89,7 +93,26 @@ try{ CID = localStorage.getItem("vruksha_cid") || ""; if(!CID){ CID = genCode();
 let USER = ""; try{ USER = localStorage.getItem("vruksha_user") || ""; if(USER) CID = USER; }catch(e){}
 $("#memWho").textContent = USER ? "@"+USER : "this browser";
 let recognizer = null, rec = null, chunks = [], listening = false, currentStage = null;
+let paused = false, turn = 0, curAudio = null, lastD = null;   // pause/stop control
 const show = (el,on)=>$(el).classList.toggle("hidden",!on);
+
+// cancel whatever the agent is doing right now (listening / recording / speaking)
+function haltCurrent(){
+  turn++; listening = false;
+  try{ recognizer && recognizer.abort(); }catch(e){}
+  try{ if(rec && rec.state && rec.state!=="inactive") rec.stop(); }catch(e){}
+  try{ if(curAudio){ curAudio.pause(); curAudio=null; } }catch(e){}
+  try{ speechSynthesis.cancel(); }catch(e){}
+  show("#done", false);
+}
+function stopConvo(){
+  haltCurrent(); paused=false; $("#pause").textContent="⏸ pause";
+  show("#convo",false); show("#confirm",false); show("#finish",false); show("#start",true);
+}
+function togglePause(){
+  if(!paused){ paused=true; haltCurrent(); orb("","paused — tap resume"); $("#pause").textContent="▶ resume"; }
+  else { paused=false; $("#pause").textContent="⏸ pause"; if(lastD) runStage(lastD); }
+}
 
 let LANGS = [{code:"en",native:"English",sr:"en-US"}];
 const srLocale = () => (LANGS.find(x=>x.code===lang)||LANGS[0]).sr || "en-US";
@@ -113,7 +136,9 @@ function speak(text){
     orb("speak","saying it");
     try{
       const r = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
-      if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); a.onended=resolve; a.onerror=resolve; return a.play().catch(resolve); }
+      if(r.status===200){ const a=new Audio(URL.createObjectURL(await r.blob())); curAudio=a;
+        const done=()=>{ if(curAudio===a) curAudio=null; resolve(); };
+        a.onended=done; a.onerror=done; return a.play().catch(done); }
     }catch(e){}
     try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=srLocale();
          u.onend=resolve; u.onerror=resolve; speechSynthesis.speak(u);
@@ -134,15 +159,18 @@ function setAgent(text){ const el=$("#agentText"); el.textContent=text; reveal(e
 function setHeard(text){ const el=$("#heard"); el.textContent=text; if(text) reveal(el); }
 
 async function runStage(d){
-  currentStage = d.stage;
+  currentStage = d.stage; lastD = d;
   if(d.stage==="confirm"){ return goConfirm(d); }
   setAgent(d.say || "…");
   $("#heard").textContent = "";
   await speak(d.say);
+  if(paused) return;                 // don't start listening if paused mid-question
   autoListen(text => sendAnswer(text, null));
 }
 
 function autoListen(onFinal){
+  if(paused) return;
+  const my = ++turn;                 // this turn's id; a pause/stop bumps `turn` to cancel it
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(sttMode==="browser" && SR){
     recognizer = new SR(); recognizer.lang = srLocale();
@@ -150,27 +178,30 @@ function autoListen(onFinal){
     let finalText = "";
     listening = true; orb("listen","listening. just talk.");
     recognizer.onresult = e => {
+      if(my!==turn) return;
       let interim=""; finalText="";
       for(const r of e.results){ (r.isFinal ? finalText+=r[0].transcript : interim+=r[0].transcript); }
       $("#heard").textContent = "“" + (finalText||interim) + "”";
     };
     recognizer.onend = () => {
+      if(my!==turn) return;          // was paused/stopped — ignore
       listening=false;
       if(finalText.trim()){ orb("think","thinking"); onFinal(finalText.trim()); }
       else { orb("listen","didn’t catch that. talk, or tap ↺."); }
     };
-    recognizer.onerror = () => { listening=false; orb("","tap ↺ to try again."); };
+    recognizer.onerror = () => { if(my!==turn) return; listening=false; orb("","tap ↺ to try again."); };
     recognizer.start();
     return;
   }
-  recordWithSilence(blob => { orb("think","writing it down"); onFinal_audio = onFinal; sendAnswer("", blob); });
+  recordWithSilence(my, blob => { if(my!==turn) return; orb("think","writing it down"); onFinal_audio = onFinal; sendAnswer("", blob); });
 }
 let onFinal_audio = null;
 
 const SILENCE_MS = 2200, MIN_SPEECH_MS = 900, GRACE_MS = 6000;
 
-async function recordWithSilence(finish){
+async function recordWithSilence(my, finish){
   const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  if(my!==turn){ stream.getTracks().forEach(t=>t.stop()); return; }   // paused before mic opened
   rec = new MediaRecorder(stream); chunks=[];
   const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(stream);
   const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an); const buf=new Uint8Array(an.fftSize);
@@ -183,7 +214,7 @@ async function recordWithSilence(finish){
     try{rec.stop()}catch(e){ finish(new Blob(chunks,{type:"audio/webm"})); } };
   $("#done").onclick = stop;
   rec.start(250);
-  const tick=()=>{ if(ended) return; an.getByteTimeDomainData(buf);
+  const tick=()=>{ if(ended||my!==turn) return; an.getByteTimeDomainData(buf);
     let peak=0; for(const v of buf) peak=Math.max(peak,Math.abs(v-128));
     const now=performance.now();
     if(peak>10){ if(!started){started=true;startAt=now;} lastVoiceAt=now; orb("listen","listening…"); }
@@ -233,11 +264,21 @@ async function sendConfirm(utterance){
   if(d.needs==="confirm"){ $("#confirmState").textContent="yes, or no."; autoListen(t=>sendConfirm(t)); return; }
   show("#confirm",false); show("#finish",true);
   const posted = d.stage==="posted";
-  $("#doneMsg").textContent = posted ? "In the record." : "Not posted. Nothing lost.";
-  $("#result").textContent = JSON.stringify(d.post_result||{message:"cancelled"}, null, 2);
-  speak(posted ? (lang==="ta"?"பதிவு செய்யப்பட்டது":"Posted to your record.") : (lang==="ta"?"பதிவு செய்யவில்லை":"Okay, not posted."));
+  const pr = d.post_result || {};
+  let msg = "Not posted. Nothing lost.";
+  if(posted){
+    if(pr.error || pr.ok===false) msg = "Couldn't post — check your Proof token in Account.";
+    else if(pr.dry_run) msg = "Draft ready — dry-run, nothing posted. Connect Proof in Account to post for real.";
+    else msg = "In the record.";
+  }
+  $("#doneMsg").textContent = msg;
+  $("#result").textContent = JSON.stringify(pr.message?pr:{...pr}, null, 2);
+  const spoke = posted && !pr.error && pr.ok!==false && !pr.dry_run;
+  speak(spoke ? (lang==="ta"?"பதிவு செய்யப்பட்டது":"Posted to your record.") : (lang==="ta"?"சரி":"Okay."));
 }
 $("#again").onclick = () => location.reload();
+$("#pause").onclick = togglePause;
+$("#stop").onclick = stopConvo;
 
 fetch("/healthz").then(r=>r.json()).then(h=>{ sttMode=h.stt; }).catch(()=>{});
 </script>

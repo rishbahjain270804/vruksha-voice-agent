@@ -103,6 +103,23 @@ def auth_verify(body: dict):
     raise HTTPException(400, "invalid or expired code")
 
 
+@app.post("/api/auth/proof")
+def auth_proof(body: dict):
+    """Store the signed-in user's own Proof token. Requires a valid current code to authorize."""
+    from . import auth
+    user = (body.get("username", "") or "").strip()
+    if not auth.verify(user, body.get("code", "")):
+        raise HTTPException(400, "invalid or expired code")
+    auth.set_proof_token(user, body.get("token", ""))
+    return {"ok": True, "connected": bool((body.get("token", "") or "").strip())}
+
+
+@app.get("/api/auth/proof_status")
+def auth_proof_status(username: str = ""):
+    from . import auth
+    return {"connected": bool(auth.get_proof_token((username or "").strip()))}
+
+
 @app.get("/api/languages")
 def languages():
     return [{"code": k, "native": v["native"], "sr": v["sr"]} for k, v in LANGUAGES.items()]
@@ -152,7 +169,9 @@ def confirm(sid: str, body: dict):
         return {**_view(st), "message": "Not posted. You can start again."}
     if decision != "yes":
         return {**_view(st), "message": "Please say yes or no.", "needs": "confirm"}
-    st.post_result = post_log(st.draft_verb, st.draft_content, st.draft_why)
+    from . import auth
+    user_token = auth.get_proof_token(st.client)   # signed-in user's own Proof token, if they set one
+    st.post_result = post_log(st.draft_verb, st.draft_content, st.draft_why, token=user_token)
     # remember this log so a future session can thread onto it (the 'next page of the story')
     log_id = ""
     try:
