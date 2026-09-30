@@ -33,7 +33,7 @@ echo "== app =="
 rm -rf "$APP" && git clone --depth 1 "$REPO" "$APP"
 python3 -m venv "$APP/.venv"
 "$APP/.venv/bin/pip" install --upgrade pip
-"$APP/.venv/bin/pip" install fastapi "uvicorn[standard]" pydantic python-dotenv httpx groq
+"$APP/.venv/bin/pip" install fastapi "uvicorn[standard]" python-multipart pydantic python-dotenv httpx groq
 
 echo "== env =="
 cat > "$APP/.env" <<ENV
