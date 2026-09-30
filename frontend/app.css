@@ -30,9 +30,14 @@ body{
 .nav .navlinks a:hover,.nav .navlinks a.active{color:var(--blue)}
 
 /* one clean paper page — the content is a centered column, not a floating card */
-.sheet{width:min(620px,100%);background:transparent;padding:8px 24px 34px;position:relative;
+.sheet{width:min(720px,100%);background:transparent;padding:8px 24px 34px;position:relative;
   animation:sheetIn .7s cubic-bezier(.2,.8,.2,1) both}
-.sheet.wide{width:min(760px,100%)}
+.sheet.wide{width:min(1080px,100%)}
+/* responsive multi-column layouts so wide screens aren't half-empty */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px 40px;align-items:start}
+.feats{display:grid;grid-template-columns:1fr 1fr;gap:6px 40px;margin-top:6px}
+.grid2 .content p{max-width:52ch}
+@media (max-width:820px){.grid2,.feats{grid-template-columns:1fr}}
 @keyframes sheetIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
 /* masthead */
