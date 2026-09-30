@@ -9,5 +9,5 @@ venv/
 *.wav
 *.mp3
 .pytest_cache/
-models/
+/models/
 .DS_Store
