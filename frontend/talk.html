@@ -197,7 +197,7 @@ function autoListen(onFinal){
   if(paused) return;
   const my = ++turn;                 // this turn's id; a pause/stop bumps `turn` to cancel it
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(sttMode==="browser" && SR){
+  if(SR){   // live transcription: show words as they're spoken (Whisper is the no-SR fallback)
     recognizer = new SR(); recognizer.lang = srLocale();
     recognizer.interimResults = true; recognizer.continuous = false; recognizer.maxAlternatives = 1;
     let finalText = "";
@@ -232,22 +232,10 @@ async function recordWithSilence(my, finish){
   const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an); const buf=new Uint8Array(an.fftSize);
   let started=false, startAt=0, lastVoiceAt=performance.now(), ended=false;
   listening=true; orb("listen","listening. take your time."); show("#done",true);
-  // live captions: a parallel browser recognizer shows words as you speak (display only).
-  // The accurate, word-for-word transcript still comes from Whisper on the recorded audio.
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(SR){ try{
-    recognizer = new SR(); recognizer.lang = srLocale();
-    recognizer.interimResults = true; recognizer.continuous = true; recognizer.maxAlternatives = 1;
-    recognizer.onresult = e => { if(ended||my!==turn) return; let t=""; for(const r of e.results) t+=r[0].transcript;
-      if(t.trim()) $("#heard").textContent = "“" + t.trim() + "”"; };
-    recognizer.onerror = () => {};
-    recognizer.start();
-  }catch(e){ recognizer=null; } }
-  const stopCaptions = () => { try{ if(recognizer){ recognizer.stop(); recognizer=null; } }catch(e){} };
   rec.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
   rec.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); try{ctx.close()}catch(e){};
     finish(new Blob(chunks,{type:"audio/webm"})); };
-  const stop=()=>{ if(ended) return; ended=true; listening=false; show("#done",false); stopCaptions();
+  const stop=()=>{ if(ended) return; ended=true; listening=false; show("#done",false);
     try{rec.stop()}catch(e){ finish(new Blob(chunks,{type:"audio/webm"})); } };
   $("#done").onclick = stop;
   rec.start(250);
