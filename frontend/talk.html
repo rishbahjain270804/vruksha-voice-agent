@@ -15,7 +15,7 @@
   <div class="navlinks"><a href="/how">How it works</a><a href="/talk" class="active">Talk</a><a href="/account">Account</a></div>
 </nav>
 
-<div class="sheet">
+<div class="sheet talk">
   <div class="eyebrow"><span class="dot"></span> Voice Log for Proof <span class="dot"></span></div>
   <h1>Speak your <span class="b">proof</span>.</h1>
   <p class="lede">Two minutes, out loud. It writes down what you said — your words, not a summary, not cleaned up.</p>
@@ -34,7 +34,9 @@
   <div id="convo" class="hidden">
     <div class="rule"></div>
     <div class="dots" id="dots"></div>
-    <div class="thread" id="thread"></div>
+    <div class="cwrap">
+      <aside class="cside"><p class="label clabel">Conversation</p><div class="thread" id="thread"></div></aside>
+      <div class="cmain">
     <p class="agent" id="agentText">…</p>
     <div class="orb-wrap">
       <div class="orb" id="orb" data-state="idle">
@@ -63,6 +65,8 @@
     <div id="typeBox" class="hidden" style="margin-top:12px">
       <textarea id="typed" placeholder="type it instead"></textarea>
       <button id="sendTyped" class="pill">Send →</button>
+    </div>
+      </div>
     </div>
   </div>
 

@@ -118,6 +118,17 @@ button:disabled{opacity:.4;cursor:default}
 .thread .tq{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);margin:0 0 4px}
 .thread .ta{font-family:var(--serif);font-size:15px;line-height:1.45;color:var(--ink);margin:0;
   border-left:2px solid var(--amber);padding-left:11px}
+.clabel{display:none}
+/* desktop: use the sides — conversation thread beside the live recorder */
+@media (min-width:900px){
+  .sheet.talk{width:min(980px,100%)}
+  #convo .cwrap{display:grid;grid-template-columns:300px 1fr;gap:44px;align-items:start;text-align:left}
+  #convo .cside{position:sticky;top:72px}
+  #convo .clabel{display:block;margin-bottom:10px}
+  #convo .cmain{text-align:center}
+  #convo .thread{max-height:60vh}
+  #convo .thread:empty::before{content:"your answers will appear here";font-family:var(--mono);font-size:11px;color:var(--dim);opacity:.7}
+}
 
 /* recorder visualizer */
 .orb-wrap{display:grid;place-items:center;margin:26px 0 10px;position:relative}
